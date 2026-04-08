@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, Platform, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Platform, ActivityIndicator, Linking, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [greeting, setGreeting] = useState('');
 
   const handleStartCall = useCallback(async () => {
     setIsLoading(true);
@@ -44,7 +45,7 @@ export default function HomeScreen() {
 
       // Call API and navigate directly to call screen (Daily's restyled pre-join handles the rest)
       console.log('[StartCall] Creating conversation...');
-      const conversation = await createConversation();
+      const conversation = await createConversation(greeting || undefined);
       console.log('[StartCall] Got URL:', conversation.conversation_url);
 
       router.push({
@@ -105,6 +106,20 @@ export default function HomeScreen() {
             )}
           </View>
         )}
+
+        <TextInput
+          style={[styles.greetingInput, {
+            backgroundColor: colors.card,
+            borderColor: colors.cardBorder,
+            color: colors.textPrimary,
+          }]}
+          placeholder="Type a custom greeting (optional)"
+          placeholderTextColor={colors.textMuted}
+          value={greeting}
+          onChangeText={setGreeting}
+          multiline={false}
+          returnKeyType="done"
+        />
 
         <Pressable
           style={({ pressed }) => [
@@ -183,6 +198,10 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full, marginBottom: Spacing.xl,
     shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 16,
     elevation: 10, minWidth: 180, minHeight: 52,
+  },
+  greetingInput: {
+    width: '100%', borderWidth: 1, borderRadius: BorderRadius.md,
+    padding: Spacing.md, fontSize: FontSize.md, marginBottom: Spacing.md,
   },
   startButtonText: { fontSize: FontSize.lg, fontWeight: '700' },
   infoCard: { borderRadius: BorderRadius.lg, padding: Spacing.lg, width: '100%', borderWidth: 1, overflow: 'hidden' },

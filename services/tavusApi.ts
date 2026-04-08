@@ -11,22 +11,27 @@ export interface ConversationResponse {
   created_at: string;
 }
 
-export async function createConversation(): Promise<ConversationResponse> {
+export async function createConversation(customGreeting?: string): Promise<ConversationResponse> {
+  const body: Record<string, any> = {
+    persona_id: PERSONA_ID,
+    replica_id: REPLICA_ID,
+    conversation_name: 'Support Session',
+    properties: {
+      max_call_duration: 1800,
+      enable_closed_captions: true,
+    },
+  };
+  if (customGreeting && customGreeting.trim().length > 0) {
+    body.custom_greeting = customGreeting.trim();
+  }
+
   const res = await fetch(`${API_BASE}/conversations`, {
     method: 'POST',
     headers: {
       'x-api-key': API_KEY,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      persona_id: PERSONA_ID,
-      replica_id: REPLICA_ID,
-      conversation_name: 'Support Session',
-      properties: {
-        max_call_duration: 1800,
-        enable_closed_captions: true,
-      },
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
