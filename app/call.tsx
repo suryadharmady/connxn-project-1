@@ -10,88 +10,28 @@ const WebView = Platform.OS !== 'web' ? require('react-native-webview').default 
 
 /*
  * Injected JS for WebView (native only).
- *
- * Phase 1 (pre-join): Do nothing. Let Tavus/Daily hair check render fully.
- * Phase 2 (in-call, 2+ videos): Post 'call-active', hide Daily chrome, restyle self-view.
- * Phase 3 (call ended, was active then videos drop to 0): Post 'call-ended'.
+ * Only detects when the call ends (videos drop to 0 after being active).
+ * Daily.co renders its own UI completely untouched.
  */
 const INJECT_JS = `
 (function(){
-  var cssId='__connxn_css';
   var wasActive=false;
   var endNotified=false;
-  var activeNotified=false;
+  var startTime=Date.now();
 
   function check(){
     var videoCount=document.querySelectorAll('video').length;
-
-    /* Phase 2 entry: call just became active */
-    if(videoCount>=2 && !wasActive){
-      wasActive=true;
-      activeNotified=true;
-      if(window.ReactNativeWebView){
-        window.ReactNativeWebView.postMessage('call-active');
-      }
-    }
-
-    /* Phase 3: call ended */
-    if(wasActive && videoCount===0 && !endNotified){
+    console.log('[INJECT_JS] videoCount='+videoCount+' wasActive='+wasActive);
+    if(videoCount>=2) wasActive=true;
+    if(wasActive && videoCount===0 && !endNotified && (Date.now()-startTime)>15000){
       endNotified=true;
-      if(window.ReactNativeWebView){
-        window.ReactNativeWebView.postMessage('call-ended');
-      }
-      return;
-    }
-
-    /* Phase 2: in-call CSS */
-    if(videoCount>=2 && !document.getElementById(cssId)){
-      var s=document.createElement('style');s.id=cssId;
-      s.textContent=\`
-        body,html{margin:0!important;padding:0!important;overflow:hidden!important;background:#000!important}
-        .daily-tray,[class*="tray"],
-        [data-testid="controls"],[data-testid="tray"],
-        [class*="controlBar"],[class*="control-bar"],
-        [class*="bottomBar"],[class*="bottom-bar"],
-        button[aria-label="People"],
-        button[aria-label="Share"],button[aria-label="Captions"],
-        button[aria-label="More"],button[aria-label="Play test sound"],
-        [class*="displayName"],[class*="participantName"],[class*="nameTag"]{
-          display:none!important;
+      setTimeout(function(){
+        if(document.querySelectorAll('video').length===0){
+          if(window.ReactNativeWebView){
+            window.ReactNativeWebView.postMessage('call-ended');
+          }
         }
-        .daily-video-tile-self,
-        [class*="self-view"],[class*="selfView"],[class*="SelfView"],
-        [class*="local-tile"],[class*="localTile"],
-        [data-testid="local-tile"],
-        [class*="LocalVideo"],[class*="localVideo"],[class*="local-video"]{
-          position:fixed!important;top:60px!important;right:12px!important;
-          width:90px!important;height:130px!important;
-          border-radius:12px!important;overflow:hidden!important;
-          z-index:999!important;
-          border:1.5px solid rgba(255,255,255,0.2)!important;
-          box-shadow:0 4px 20px rgba(0,0,0,0.5)!important;
-        }
-        .daily-video-tile-self video,
-        [data-testid="local-tile"] video,
-        [class*="self-view"] video,[class*="selfView"] video,
-        [class*="SelfView"] video,[class*="local-tile"] video,
-        [class*="localTile"] video,
-        [class*="LocalVideo"] video,[class*="localVideo"] video,
-        [class*="local-video"] video{
-          width:100%!important;height:100%!important;object-fit:cover!important;
-        }
-        .daily-video-tile:not(.daily-video-tile-self),
-        [class*="videoContainer"],[class*="video-container"],[class*="VideoContainer"],
-        main,[role="main"],.daily-call-wrapper,.daily-videos-wrapper,
-        [class*="CallWrapper"],[class*="call-wrapper"],
-        [class*="VideosWrapper"],[class*="videos-wrapper"],
-        [class*="stage"],[class*="Stage"]{
-          width:100vw!important;height:100vh!important;
-          position:fixed!important;top:0!important;left:0!important;
-          border-radius:0!important;margin:0!important;padding:0!important;z-index:1!important;
-        }
-        video{object-fit:cover!important}
-      \`;
-      document.head.appendChild(s);
+      },3000);
     }
   }
 
@@ -100,9 +40,6 @@ const INJECT_JS = `
 })();
 `;
 
-/* ================================================================== */
-/*  Component                                                          */
-/* ================================================================== */
 export default function CallScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -113,7 +50,6 @@ export default function CallScreen() {
 
   const [callActive, setCallActive] = useState(true);
   const [isLeaving, setIsLeaving] = useState(false);
-  const [isCallActive, setIsCallActive] = useState(false);
   const startTimeRef = useRef(Date.now());
 
   // Web: refs for Daily.co call frame
@@ -133,14 +69,9 @@ export default function CallScreen() {
     router.replace({ pathname: '/call-ended', params: { duration: String(secs) } });
   }, [callActive, conversationId, router]);
 
-  // Native: receive messages from injected JS
+  // Native: receive call-ended from injected JS
   const handleMessage = useCallback((event: any) => {
-    const data = event.nativeEvent?.data;
-    if (data === 'call-active') {
-      setIsCallActive(true);
-      startTimeRef.current = Date.now();
-    }
-    if (data === 'call-ended') {
+    if (event.nativeEvent?.data === 'call-ended') {
       handleLeave();
     }
   }, [handleLeave]);
@@ -201,7 +132,6 @@ export default function CallScreen() {
     <View style={styles.root}>
       {!isLeaving && (
         Platform.OS === 'web' ? (
-          /* Web: Daily.co JS SDK renders its own iframe into this container */
           <div
             ref={containerRef as any}
             style={{
@@ -211,7 +141,6 @@ export default function CallScreen() {
             }}
           />
         ) : (
-          /* Mobile: fullscreen WebView — Daily.co hair check handles pre-join */
           <WebView
             source={{ uri: conversationUrl }}
             style={StyleSheet.absoluteFill}
@@ -223,7 +152,6 @@ export default function CallScreen() {
             mediaCapturePermissionGrantType="grant"
             androidHardwareAccelerationDisabled={false}
             setSupportMultipleWindows={false}
-            allowsBackForwardNavigationGestures={false}
             onPermissionRequest={(req: any) => req.grant(req.resources)}
             injectedJavaScript={INJECT_JS}
             onMessage={handleMessage}
@@ -231,59 +159,12 @@ export default function CallScreen() {
           />
         )
       )}
-
-      {/* Mobile: floating End Call button — only visible when call is active */}
-      {Platform.OS !== 'web' && isCallActive && !isLeaving && (
-        <View style={styles.endCallOverlay}>
-          <Pressable
-            onPress={handleLeave}
-            style={({ pressed }) => [
-              styles.endCallBtn,
-              pressed && { opacity: 0.7, transform: [{ scale: 0.9 }] },
-            ]}
-          >
-            <Ionicons name="call" size={24} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
-          </Pressable>
-          <Text style={styles.endCallLabel}>End Call</Text>
-        </View>
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
-  /* Mobile: floating end call overlay */
-  endCallOverlay: {
-    position: 'absolute',
-    bottom: 40,
-    alignSelf: 'center',
-    alignItems: 'center',
-    zIndex: 999,
-  },
-  endCallBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  endCallLabel: {
-    color: '#fff',
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-    marginTop: 6,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  /* Error state */
   errorContainer: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
     padding: Spacing.lg, gap: Spacing.md,
