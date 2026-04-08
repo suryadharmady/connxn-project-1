@@ -11,20 +11,28 @@ const WebView = Platform.OS !== 'web' ? require('react-native-webview').default 
 /*
  * Injected JS for WebView (native only).
  *
- * Phase 1 (pre-join): Do nothing. Let Tavus/Daily render fully.
- * Phase 2 (in-call, 2+ videos): Hide Daily chrome, restyle self-view.
- * Phase 3 (call ended, was active then videos drop to 0): Notify RN.
+ * Phase 1 (pre-join): Do nothing. Let Tavus/Daily hair check render fully.
+ * Phase 2 (in-call, 2+ videos): Post 'call-active', hide Daily chrome, restyle self-view.
+ * Phase 3 (call ended, was active then videos drop to 0): Post 'call-ended'.
  */
 const INJECT_JS = `
 (function(){
   var cssId='__connxn_css';
   var wasActive=false;
   var endNotified=false;
+  var activeNotified=false;
 
   function check(){
     var videoCount=document.querySelectorAll('video').length;
 
-    if(videoCount>=2) wasActive=true;
+    /* Phase 2 entry: call just became active */
+    if(videoCount>=2 && !wasActive){
+      wasActive=true;
+      activeNotified=true;
+      if(window.ReactNativeWebView){
+        window.ReactNativeWebView.postMessage('call-active');
+      }
+    }
 
     /* Phase 3: call ended */
     if(wasActive && videoCount===0 && !endNotified){
@@ -92,22 +100,6 @@ const INJECT_JS = `
 })();
 `;
 
-/* ------------------------------------------------------------------ */
-/*  Native camera preview for pre-join                                 */
-/* ------------------------------------------------------------------ */
-function NativeCameraPreview() {
-  const [Cam, setCam] = useState<any>(null);
-  useEffect(() => {
-    let mounted = true;
-    import('expo-camera')
-      .then((mod) => { if (mounted) setCam(() => mod.CameraView); })
-      .catch(() => {});
-    return () => { mounted = false; };
-  }, []);
-  if (!Cam) return <View style={{ flex: 1, backgroundColor: '#111' }} />;
-  return <Cam style={{ flex: 1 }} facing="front" />;
-}
-
 /* ================================================================== */
 /*  Component                                                          */
 /* ================================================================== */
@@ -121,62 +113,74 @@ export default function CallScreen() {
 
   const [callActive, setCallActive] = useState(true);
   const [isLeaving, setIsLeaving] = useState(false);
-  const [hasJoined, setHasJoined] = useState(false); // mobile: gate before loading WebView
+  const [isCallActive, setIsCallActive] = useState(false);
   const startTimeRef = useRef(Date.now());
+
+  // Web: refs for Daily.co call frame
+  const containerRef = useRef<HTMLDivElement>(null);
+  const callFrameRef = useRef<any>(null);
 
   const handleLeave = useCallback(async () => {
     if (!callActive) return;
     setCallActive(false);
     setIsLeaving(true);
     const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    if (Platform.OS === 'web' && callFrameRef.current) {
+      try { callFrameRef.current.destroy(); } catch {}
+      callFrameRef.current = null;
+    }
     try { if (conversationId) await endConversation(conversationId); } catch {}
     router.replace({ pathname: '/call-ended', params: { duration: String(secs) } });
   }, [callActive, conversationId, router]);
 
-  // Native: receive "call-ended" from injected JS
+  // Native: receive messages from injected JS
   const handleMessage = useCallback((event: any) => {
-    if (event.nativeEvent?.data === 'call-ended') {
+    const data = event.nativeEvent?.data;
+    if (data === 'call-active') {
+      setIsCallActive(true);
+      startTimeRef.current = Date.now();
+    }
+    if (data === 'call-ended') {
       handleLeave();
     }
   }, [handleLeave]);
 
-  // Web: listen for Daily.co postMessage events signalling call ended
+  // Web: create Daily.co call frame via JS SDK and listen for left-meeting
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (Platform.OS !== 'web' || !conversationUrl || isLeaving) return;
 
-    const handler = (event: MessageEvent) => {
-      // Only process messages from Daily.co or Tavus origins
-      const origin = event.origin || '';
-      if (!origin.includes('daily') && !origin.includes('tavus')) return;
+    let destroyed = false;
 
-      const d = event.data;
-      if (!d) return;
+    (async () => {
+      try {
+        const DailyIframe = (await import('@daily-co/daily-js')).default;
+        if (destroyed || !containerRef.current) return;
 
-      // Daily.co sends { action: 'left-meeting' } or similar typed objects
-      if (typeof d === 'object' && d !== null) {
-        const action = d.action || d.type || '';
-        if (
-          action === 'left-meeting' ||
-          action === 'meeting-ended' ||
-          action === 'call-ended' ||
-          action === 'error'
-        ) {
-          handleLeave();
-          return;
-        }
+        const frame = DailyIframe.createFrame(containerRef.current, {
+          iframeStyle: { width: '100%', height: '100%', border: 'none' },
+          showLeaveButton: true,
+          showFullscreenButton: false,
+        });
+
+        callFrameRef.current = frame;
+
+        frame.on('left-meeting', () => { if (!destroyed) handleLeave(); });
+        frame.on('error', () => { if (!destroyed) handleLeave(); });
+
+        await frame.join({ url: conversationUrl });
+      } catch (err) {
+        console.error('[Daily] Failed to create frame:', err);
       }
+    })();
 
-      // Fallback: string data
-      if (typeof d === 'string') {
-        if (d.includes('left-meeting') || d.includes('meeting-ended') || d.includes('call-ended')) {
-          handleLeave();
-        }
+    return () => {
+      destroyed = true;
+      if (callFrameRef.current) {
+        try { callFrameRef.current.destroy(); } catch {}
+        callFrameRef.current = null;
       }
     };
-
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [handleLeave]);
+  }, [conversationUrl, isLeaving, handleLeave]);
 
   if (!conversationUrl) {
     return (
@@ -197,78 +201,51 @@ export default function CallScreen() {
     <View style={styles.root}>
       {!isLeaving && (
         Platform.OS === 'web' ? (
-          <iframe
-            src={conversationUrl}
-            allow="camera *; microphone *; autoplay *; display-capture *"
+          /* Web: Daily.co JS SDK renders its own iframe into this container */
+          <div
+            ref={containerRef as any}
             style={{
               position: 'absolute' as const, inset: 0,
-              width: '100%', height: '100%', border: 'none',
+              width: '100%', height: '100%',
               backgroundColor: '#000',
             }}
           />
-        ) : !hasJoined ? (
-          /* ---- Mobile pre-join: native camera preview, no WebView ---- */
-          <>
-            <View style={styles.webviewArea}>
-              <NativeCameraPreview />
-            </View>
-            <View style={styles.mobileBottomBar}>
-              <Pressable
-                onPress={() => router.replace('/')}
-                style={[styles.mobileBackBtn, { borderColor: 'rgba(255,255,255,0.2)' }]}
-              >
-                <Ionicons name="arrow-back" size={18} color="#fff" />
-                <Text style={styles.mobileBackText}>Back</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => { setHasJoined(true); startTimeRef.current = Date.now(); }}
-                style={styles.mobileJoinBtn}
-              >
-                <Ionicons name="videocam" size={18} color="#fff" />
-                <Text style={styles.mobileJoinText}>Join Call</Text>
-              </Pressable>
-            </View>
-          </>
         ) : (
-          /* ---- Mobile in-call: WebView with Daily.co ---- */
-          <>
-            <View style={styles.webviewArea}>
-              <WebView
-                source={{ uri: conversationUrl }}
-                style={{ flex: 1 }}
-                allowsInlineMediaPlayback
-                mediaPlaybackRequiresUserAction={false}
-                originWhitelist={['*']}
-                javaScriptEnabled
-                domStorageEnabled
-                mediaCapturePermissionGrantType="grant"
-                androidHardwareAccelerationDisabled={false}
-                setSupportMultipleWindows={false}
-                allowsBackForwardNavigationGestures={false}
-                onPermissionRequest={(req: any) => req.grant(req.resources)}
-                injectedJavaScript={INJECT_JS}
-                onMessage={handleMessage}
-                onError={(e: any) => console.warn('[WebView]', e.nativeEvent?.description)}
-              />
-            </View>
-            <View style={styles.mobileBottomBar}>
-              <Pressable
-                onPress={() => router.replace('/')}
-                style={[styles.mobileBackBtn, { borderColor: 'rgba(255,255,255,0.2)' }]}
-              >
-                <Ionicons name="arrow-back" size={18} color="#fff" />
-                <Text style={styles.mobileBackText}>Back</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleLeave}
-                style={styles.mobileEndBtn}
-              >
-                <Ionicons name="call" size={18} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
-                <Text style={styles.mobileEndText}>End Call</Text>
-              </Pressable>
-            </View>
-          </>
+          /* Mobile: fullscreen WebView — Daily.co hair check handles pre-join */
+          <WebView
+            source={{ uri: conversationUrl }}
+            style={StyleSheet.absoluteFill}
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            originWhitelist={['*']}
+            javaScriptEnabled
+            domStorageEnabled
+            mediaCapturePermissionGrantType="grant"
+            androidHardwareAccelerationDisabled={false}
+            setSupportMultipleWindows={false}
+            allowsBackForwardNavigationGestures={false}
+            onPermissionRequest={(req: any) => req.grant(req.resources)}
+            injectedJavaScript={INJECT_JS}
+            onMessage={handleMessage}
+            onError={(e: any) => console.warn('[WebView]', e.nativeEvent?.description)}
+          />
         )
+      )}
+
+      {/* Mobile: floating End Call button — only visible when call is active */}
+      {Platform.OS !== 'web' && isCallActive && !isLeaving && (
+        <View style={styles.endCallOverlay}>
+          <Pressable
+            onPress={handleLeave}
+            style={({ pressed }) => [
+              styles.endCallBtn,
+              pressed && { opacity: 0.7, transform: [{ scale: 0.9 }] },
+            ]}
+          >
+            <Ionicons name="call" size={24} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+          </Pressable>
+          <Text style={styles.endCallLabel}>End Call</Text>
+        </View>
       )}
     </View>
   );
@@ -276,59 +253,37 @@ export default function CallScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
-  webviewArea: {
-    flex: 1,
-  },
-  mobileBottomBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  /* Mobile: floating end call overlay */
+  endCallOverlay: {
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 4,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    zIndex: 999,
   },
-  mobileBackBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-  },
-  mobileBackText: {
-    color: '#fff',
-    fontSize: FontSize.sm,
-    fontWeight: '500',
-  },
-  mobileJoinBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: '#22C55E',
-  },
-  mobileJoinText: {
-    color: '#fff',
-    fontSize: FontSize.sm,
-    fontWeight: '600',
-  },
-  mobileEndBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.sm,
+  endCallBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
   },
-  mobileEndText: {
+  endCallLabel: {
     color: '#fff',
-    fontSize: FontSize.sm,
+    fontSize: FontSize.xs,
     fontWeight: '600',
+    marginTop: 6,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
+  /* Error state */
   errorContainer: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
     padding: Spacing.lg, gap: Spacing.md,
