@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -L \"https://docs.tavus.io/api-reference/overview\")",
+      "Bash(curl -s -L \"https://docs.tavus.io/api-reference/conversations/end-conversation\")",
+      "Bash(curl -sL \"https://docs.tavus.io/sections/conversational-video-interface/cvi-quickstart\")",
+      "Bash(curl -s -L \"https://docs.tavus.io/api-reference/conversations/get-conversation\")",
+      "WebFetch(domain:docs.tavus.io)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(npm view:*)",
+      "Bash(curl:*)",
+      "Bash(npx @tavus/cvi-ui@latest init)",
+      "Bash(yes)",
+      "Bash(npx @tavus/cvi-ui@latest add hair-check-01)",
+      "Bash(rm:*)",
+      "Bash(npx expo:*)",
+      "Bash(mv app/components/cvi components/cvi)",
+      "Bash(rmdir app/components)",
+      "Bash(npx tsc:*)",
+      "Bash(xargs wc:*)"
+    ]
+  }
+}

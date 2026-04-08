@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connxn AI — Screen Mockups</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1a2e;
+    color: #fff;
+    padding: 32px;
+  }
+  h1 { text-align: center; font-size: 28px; margin-bottom: 8px; }
+  .page-sub { text-align: center; color: #94A3B8; font-size: 14px; margin-bottom: 40px; }
+  .section-title {
+    font-size: 18px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 2px; color: #00D4AA; margin-bottom: 20px;
+    text-align: center; padding-top: 32px; border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .row {
+    display: flex; gap: 24px; justify-content: center;
+    flex-wrap: wrap; margin-bottom: 48px;
+  }
+  .phone {
+    width: 320px; height: 640px;
+    border-radius: 32px; overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.12);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    position: relative; flex-shrink: 0;
+  }
+  .phone-label {
+    text-align: center; margin-top: 12px; font-size: 13px;
+    color: #94A3B8; font-weight: 600; letter-spacing: 0.5px;
+  }
+
+  /* ============================================================ */
+  /*  PRE-JOIN — LIGHT                                             */
+  /* ============================================================ */
+  .prejoin-light {
+    background: #F8FAFC;
+    display: flex; flex-direction: column; height: 100%;
+  }
+  .prejoin-light .cam-area {
+    flex: 6; padding: 12px 12px 0; position: relative;
+  }
+  .prejoin-light .cam-frame {
+    width: 100%; height: 100%;
+    border-radius: 24px; overflow: hidden;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .prejoin-light .cam-frame .face {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px; color: rgba(255,255,255,0.3);
+  }
+  .prejoin-light .cam-brand {
+    position: absolute; top: 20px; left: 0; right: 0;
+    text-align: center; font-size: 10px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+  }
+  .prejoin-light .prep-panel {
+    flex: 4; padding: 20px 20px 16px; text-align: center;
+  }
+  .prejoin-light .prep-panel h2 {
+    font-size: 22px; font-weight: 700; color: #0F172A; margin-bottom: 4px;
+  }
+  .prejoin-light .prep-panel .sub {
+    font-size: 13px; color: #64748B; margin-bottom: 16px;
+  }
+  .prejoin-light .toggle-row {
+    display: flex; gap: 10px; margin-bottom: 16px;
+  }
+  .prejoin-light .toggle-btn {
+    flex: 1; padding: 12px 0; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 13px; font-weight: 600;
+  }
+  .prejoin-light .toggle-btn.on {
+    background: rgba(0,196,154,0.15); border: 1.5px solid #00C49A; color: #00C49A;
+  }
+  .prejoin-light .toggle-btn.off {
+    background: rgba(239,68,68,0.12); border: 1.5px solid #EF4444; color: #EF4444;
+  }
+  .prejoin-light .join-btn {
+    width: 100%; padding: 15px 0; border-radius: 9999px;
+    background: #00C49A; color: #fff; border: none;
+    font-size: 17px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 6px 20px rgba(0,196,154,0.3);
+    margin-bottom: 8px;
+  }
+  .prejoin-light .cancel { font-size: 14px; color: #64748B; }
+
+  /* ============================================================ */
+  /*  PRE-JOIN — DARK                                              */
+  /* ============================================================ */
+  .prejoin-dark {
+    background: #0F172A;
+    display: flex; flex-direction: column; height: 100%;
+  }
+  .prejoin-dark .cam-area {
+    flex: 6; padding: 12px 12px 0; position: relative;
+  }
+  .prejoin-dark .cam-frame {
+    width: 100%; height: 100%;
+    border-radius: 24px; overflow: hidden;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .prejoin-dark .cam-frame .face {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px; color: rgba(255,255,255,0.2);
+  }
+  .prejoin-dark .cam-brand {
+    position: absolute; top: 20px; left: 0; right: 0;
+    text-align: center; font-size: 10px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+  }
+  .prejoin-dark .prep-panel {
+    flex: 4; padding: 20px 20px 16px; text-align: center;
+  }
+  .prejoin-dark .prep-panel h2 {
+    font-size: 22px; font-weight: 700; color: #F1F5F9; margin-bottom: 4px;
+  }
+  .prejoin-dark .prep-panel .sub {
+    font-size: 13px; color: #94A3B8; margin-bottom: 16px;
+  }
+  .prejoin-dark .toggle-row {
+    display: flex; gap: 10px; margin-bottom: 16px;
+  }
+  .prejoin-dark .toggle-btn {
+    flex: 1; padding: 12px 0; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 13px; font-weight: 600;
+  }
+  .prejoin-dark .toggle-btn.on {
+    background: rgba(0,212,170,0.2); border: 1.5px solid #00D4AA; color: #00D4AA;
+  }
+  .prejoin-dark .toggle-btn.off {
+    background: rgba(248,113,113,0.2); border: 1.5px solid #F87171; color: #F87171;
+  }
+  .prejoin-dark .join-btn {
+    width: 100%; padding: 15px 0; border-radius: 9999px;
+    background: #00D4AA; color: #0F172A; border: none;
+    font-size: 17px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 6px 20px rgba(0,212,170,0.3);
+    margin-bottom: 8px;
+  }
+  .prejoin-dark .cancel { font-size: 14px; color: #94A3B8; }
+
+  /* ============================================================ */
+  /*  CALL SCREEN — shared base                                    */
+  /* ============================================================ */
+  .call-screen {
+    background: #000; position: relative; height: 100%;
+    display: flex; flex-direction: column;
+  }
+  /* Simulated avatar video */
+  .call-screen .avatar-bg {
+    position: absolute; inset: 0;
+    background: linear-gradient(160deg, #1e293b 0%, #0f172a 40%, #1a1a2e 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .call-screen .avatar-bg .avatar-circle {
+    width: 120px; height: 120px; border-radius: 50%;
+    background: rgba(0,212,170,0.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px; color: rgba(0,212,170,0.4);
+  }
+
+  /* Self-view thumbnail */
+  .call-screen .self-view {
+    position: absolute; top: 60px; right: 12px;
+    width: 100px; height: 140px; border-radius: 12px;
+    background: linear-gradient(135deg, #334155, #1e293b);
+    border: 2px solid rgba(255,255,255,0.2);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    z-index: 30;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; color: rgba(255,255,255,0.3);
+    overflow: hidden;
+  }
+
+  /* Top gradient header */
+  .call-screen .top-gradient {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+    padding: 44px 20px 20px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.3) 60%, transparent 100%);
+  }
+  .call-screen .top-row {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .call-screen .timer {
+    font-size: 15px; font-weight: 600; color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+  .call-screen .brand-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+    text-transform: uppercase; color: rgba(255,255,255,0.6);
+  }
+  .call-screen .ping {
+    display: flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 9999px;
+    background: rgba(0,0,0,0.35);
+  }
+  .call-screen .ping-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #34D399;
+  }
+  .call-screen .ping-text {
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.7);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Bottom gradient + pill controls */
+  .call-screen .bottom-gradient {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 20;
+    padding: 48px 0 32px;
+    background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.2) 50%, transparent 100%);
+    display: flex; justify-content: center;
+  }
+  .call-screen .pill {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 22px; border-radius: 9999px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .call-screen .ctrl-btn {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: #fff; border: none;
+  }
+  .call-screen .ctrl-btn.muted {
+    background: rgba(248,113,113,0.2);
+    border: 1.5px solid rgba(248,113,113,0.5);
+    color: #F87171;
+  }
+  .call-screen .end-btn {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #EF4444; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #fff; border: none;
+    box-shadow: 0 4px 16px rgba(239,68,68,0.5);
+  }
+</style>
+</head>
+<body>
+
+<h1>Connxn AI — UI Mockups</h1>
+<p class="page-sub">All four screen states for approval before implementation</p>
+
+<!-- ============================================================ -->
+<!--  PRE-JOIN SCREENS                                             -->
+<!-- ============================================================ -->
+<div class="section-title">Pre-Join Screen</div>
+<div class="row">
+
+  <!-- Pre-join LIGHT -->
+  <div>
+    <div class="phone">
+      <div class="prejoin-light">
+        <div class="cam-area">
+          <div class="cam-frame">
+            <div class="face">👤</div>
+            <div class="cam-brand">Connxn AI</div>
+          </div>
+        </div>
+        <div class="prep-panel">
+          <h2>Ready to join?</h2>
+          <p class="sub">Check your devices before entering</p>
+          <div class="toggle-row">
+            <div class="toggle-btn on">🎤 Mic On</div>
+            <div class="toggle-btn on">📹 Camera On</div>
+          </div>
+          <div class="join-btn">📹 Join Call</div>
+          <p class="cancel">Cancel</p>
+        </div>
+      </div>
+    </div>
+    <p class="phone-label">Pre-Join — Light Mode</p>
+  </div>
+
+  <!-- Pre-join DARK -->
+  <div>
+    <div class="phone">
+      <div class="prejoin-dark">
+        <div class="cam-area">
+          <div class="cam-frame">
+            <div class="face">👤</div>
+            <div class="cam-brand">Connxn AI</div>
+          </div>
+        </div>
+        <div class="prep-panel">
+          <h2>Ready to join?</h2>
+          <p class="sub">Check your devices before entering</p>
+          <div class="toggle-row">
+            <div class="toggle-btn on">🎤 Mic On</div>
+            <div class="toggle-btn off">📹 Cam Off</div>
+          </div>
+          <div class="join-btn">📹 Join Call</div>
+          <p class="cancel">Cancel</p>
+        </div>
+      </div>
+    </div>
+    <p class="phone-label">Pre-Join — Dark Mode</p>
+  </div>
+
+</div>
+
+<!-- ============================================================ -->
+<!--  CALL SCREENS                                                 -->
+<!-- ============================================================ -->
+<div class="section-title">Call Screen (During Call)</div>
+<div class="row">
+
+  <!-- Call LIGHT (same look — dark overlays over video regardless of theme) -->
+  <div>
+    <div class="phone">
+      <div class="call-screen">
+        <!-- Avatar background -->
+        <div class="avatar-bg">
+          <div class="avatar-circle">🤖</div>
+        </div>
+
+        <!-- Self-view -->
+        <div class="self-view">👤</div>
+
+        <!-- Top gradient -->
+        <div class="top-gradient">
+          <div class="top-row">
+            <span class="timer">02:47</span>
+            <span class="brand-label">Connxn AI</span>
+            <div class="ping">
+              <div class="ping-dot"></div>
+              <span class="ping-text">42 ms</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom controls -->
+        <div class="bottom-gradient">
+          <div class="pill">
+            <div class="ctrl-btn">🎤</div>
+            <div class="end-btn">📞</div>
+            <div class="ctrl-btn">📹</div>
+            <div class="ctrl-btn">🔄</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="phone-label">Call Screen — Light Mode</p>
+  </div>
+
+  <!-- Call DARK -->
+  <div>
+    <div class="phone">
+      <div class="call-screen">
+        <div class="avatar-bg">
+          <div class="avatar-circle">🤖</div>
+        </div>
+        <div class="self-view">👤</div>
+        <div class="top-gradient">
+          <div class="top-row">
+            <span class="timer">05:12</span>
+            <span class="brand-label">Connxn AI</span>
+            <div class="ping">
+              <div class="ping-dot" style="background:#FBBF24"></div>
+              <span class="ping-text">128 ms</span>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-gradient">
+          <div class="pill">
+            <div class="ctrl-btn muted">🔇</div>
+            <div class="end-btn">📞</div>
+            <div class="ctrl-btn">📹</div>
+            <div class="ctrl-btn">🔄</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="phone-label">Call Screen — Dark Mode (mic muted)</p>
+  </div>
+
+</div>
+
+<!-- ============================================================ -->
+<!--  FLOW DIAGRAM                                                 -->
+<!-- ============================================================ -->
+<div class="section-title">Fixed Navigation Flow</div>
+<div style="max-width:700px; margin: 0 auto 48px; padding: 24px; border-radius: 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+  <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center;">
+    <div style="padding:12px 20px; border-radius:12px; background:#00D4AA; color:#0F172A; font-weight:700; font-size:14px;">
+      Home Screen<br><span style="font-weight:400; font-size:12px;">Tap "Start Call"</span>
+    </div>
+    <div style="font-size:24px; color:#475569;">→</div>
+    <div style="padding:12px 20px; border-radius:12px; background:rgba(0,212,170,0.15); border:1.5px solid #00D4AA; color:#00D4AA; font-weight:700; font-size:14px;">
+      Pre-Join Screen<br><span style="font-weight:400; font-size:12px;">Camera preview + "Join Call"</span>
+    </div>
+    <div style="font-size:24px; color:#475569;">→</div>
+    <div style="padding:12px 20px; border-radius:12px; background:rgba(0,212,170,0.15); border:1.5px solid #00D4AA; color:#00D4AA; font-weight:700; font-size:14px;">
+      API Call<br><span style="font-weight:400; font-size:12px;">createConversation()</span>
+    </div>
+    <div style="font-size:24px; color:#475569;">→</div>
+    <div style="padding:12px 20px; border-radius:12px; background:#00D4AA; color:#0F172A; font-weight:700; font-size:14px;">
+      Call Screen<br><span style="font-weight:400; font-size:12px;">Live video call</span>
+    </div>
+  </div>
+  <div style="margin-top:20px; padding:16px; border-radius:10px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);">
+    <p style="color:#F87171; font-weight:600; font-size:13px; margin-bottom:6px;">🐛 BUG FOUND: Current flow skips Pre-Join entirely</p>
+    <p style="color:#94A3B8; font-size:12px; line-height:1.5;">
+      <strong>index.tsx</strong> calls createConversation() and navigates directly to <strong>/call</strong>.<br>
+      Daily.co shows its own pre-join inside the WebView, but our CSS injection <strong>hides their Join button</strong>.<br>
+      <strong>Fix:</strong> Navigate to <strong>/hair-check</strong> first → user sees our camera preview + Join button → API call + navigate to /call.
+    </p>
+  </div>
+</div>
+
+</body>
+</html>

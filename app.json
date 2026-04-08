@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "MyMultiplatformApp",
-    "slug": "MyMultiplatformApp",
+    "name": "Tavus Avatar",
+    "slug": "tavus-avatar-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
