@@ -17,7 +17,9 @@
       "Bash(mv app/components/cvi components/cvi)",
       "Bash(rmdir app/components)",
       "Bash(npx tsc:*)",
-      "Bash(xargs wc:*)"
+      "Bash(xargs wc:*)",
+      "WebSearch",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('layers',{}\\).get\\('tts',{}\\), indent=2\\)\\)\")"
     ]
   }
 }

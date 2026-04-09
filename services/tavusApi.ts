@@ -3,6 +3,9 @@ const API_KEY = process.env.EXPO_PUBLIC_TAVUS_API_KEY ?? '';
 const PERSONA_ID = process.env.EXPO_PUBLIC_PERSONA_ID ?? '';
 const REPLICA_ID = process.env.EXPO_PUBLIC_REPLICA_ID ?? '';
 
+// Test persona with ElevenLabs TTS (pre-configured on Tavus side)
+const TEST_PERSONA_ID = process.env.EXPO_PUBLIC_TAVUS_TEST_PERSONA_ID ?? '';
+
 export interface ConversationResponse {
   conversation_id: string;
   conversation_name: string;
@@ -12,8 +15,13 @@ export interface ConversationResponse {
 }
 
 export async function createConversation(customGreeting?: string): Promise<ConversationResponse> {
+  const activePersona = TEST_PERSONA_ID || PERSONA_ID;
+  if (TEST_PERSONA_ID) {
+    console.log('[Tavus] Using test persona (ElevenLabs voice):', TEST_PERSONA_ID);
+  }
+
   const body: Record<string, any> = {
-    persona_id: PERSONA_ID,
+    persona_id: activePersona,
     replica_id: REPLICA_ID,
     conversation_name: 'Support Session',
     properties: {
