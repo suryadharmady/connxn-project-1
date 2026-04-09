@@ -1,10 +1,11 @@
 const API_BASE = 'https://tavusapi.com/v2';
 const API_KEY = process.env.EXPO_PUBLIC_TAVUS_API_KEY ?? '';
-const PERSONA_ID = process.env.EXPO_PUBLIC_PERSONA_ID ?? '';
 const REPLICA_ID = process.env.EXPO_PUBLIC_REPLICA_ID ?? '';
 
-// Test persona with ElevenLabs TTS (pre-configured on Tavus side)
-const TEST_PERSONA_ID = process.env.EXPO_PUBLIC_TAVUS_TEST_PERSONA_ID ?? '';
+// Echo-mode persona: pipeline_mode="echo" disables Tavus's own STT/LLM/TTS.
+// The replica only animates when we send conversation.echo events with audio.
+// Created via POST /v2/personas { persona_name, pipeline_mode: "echo" }
+const ECHO_PERSONA_ID = process.env.EXPO_PUBLIC_TAVUS_ECHO_PERSONA_ID ?? '';
 
 export interface ConversationResponse {
   conversation_id: string;
@@ -15,13 +16,17 @@ export interface ConversationResponse {
 }
 
 export async function createConversation(customGreeting?: string): Promise<ConversationResponse> {
-  const activePersona = TEST_PERSONA_ID || PERSONA_ID;
-  if (TEST_PERSONA_ID) {
-    console.log('[Tavus] Using test persona (ElevenLabs voice):', TEST_PERSONA_ID);
+  // Echo / passthrough mode: pipeline_mode="echo" on the persona disables
+  // Tavus's own STT/LLM/TTS pipeline. The replica sits idle and only
+  // animates when we send conversation.echo events with audio data.
+  // All conversation logic is handled by the ElevenLabs Agent externally.
+
+  if (!ECHO_PERSONA_ID) {
+    console.warn('[Tavus] No EXPO_PUBLIC_TAVUS_ECHO_PERSONA_ID set — replica will run its own pipeline!');
   }
+  console.log('[Tavus] Creating echo-mode conversation with persona:', ECHO_PERSONA_ID || '(none)');
 
   const body: Record<string, any> = {
-    persona_id: activePersona,
     replica_id: REPLICA_ID,
     conversation_name: 'Support Session',
     properties: {
@@ -29,6 +34,11 @@ export async function createConversation(customGreeting?: string): Promise<Conve
       enable_closed_captions: true,
     },
   };
+
+  // Attach the echo persona to disable Tavus STT/LLM/TTS
+  if (ECHO_PERSONA_ID) {
+    body.persona_id = ECHO_PERSONA_ID;
+  }
   if (customGreeting && customGreeting.trim().length > 0) {
     body.custom_greeting = customGreeting.trim();
   }
