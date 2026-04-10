@@ -138,6 +138,7 @@ export class ElevenLabsAgent {
   }
 
   private _handleMessage(data: any): void {
+    console.log('[EL Agent] msg type:', data.type);
     switch (data.type) {
       case 'conversation_initiation_metadata': {
         console.log('[ElevenLabs] Got initiation metadata');
