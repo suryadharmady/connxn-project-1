@@ -24,8 +24,8 @@ export class ElevenLabsAgent {
   private apiKey = '';
   private destroyed = false;
 
-  // Output sample rate reported by the server (default 16000)
-  public outputSampleRate = 16000;
+  // Output sample rate reported by the server (default 24000 — ElevenLabs standard)
+  public outputSampleRate = 24000;
 
   // Callbacks
   private _onAudioOutput: AudioOutputCallback | null = null;
@@ -150,7 +150,7 @@ export class ElevenLabsAgent {
         } else if (outFmt === 'pcm_44100') {
           this.outputSampleRate = 44100;
         } else {
-          this.outputSampleRate = 16000;
+          this.outputSampleRate = 24000;
         }
         console.log('[ElevenLabs] Output sample rate:', this.outputSampleRate);
         this._onConnected?.();

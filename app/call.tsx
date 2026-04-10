@@ -7,56 +7,9 @@ import { endConversation } from '@/services/tavusApi';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Spacing, FontSize, BorderRadius } from '@/constants/theme';
 import { ElevenLabsAgent } from '@/services/elevenLabsAgent';
+import { buildCallPageHtml } from '@/services/callPage';
 
 const WebView = Platform.OS !== 'web' ? require('react-native-webview').default : null;
-
-/*
- * Injected JS for WebView (native only).
- * Only detects when the call ends (videos drop to 0 after being active).
- * Daily.co renders its own UI completely untouched.
- */
-const INJECT_JS = `
-(function(){
-  var wasActive=false;
-  var endNotified=false;
-  var startTime=Date.now();
-
-  function notifyEnd(){
-    if(endNotified) return;
-    endNotified=true;
-    if(window.ReactNativeWebView){
-      window.ReactNativeWebView.postMessage('call-ended');
-    }
-  }
-
-  /* Approach 1a: video count detection */
-  function check(){
-    var videoCount=document.querySelectorAll('video').length;
-    console.log('[INJECT_JS] videoCount='+videoCount+' wasActive='+wasActive);
-    if(videoCount>=2) wasActive=true;
-    if(wasActive && videoCount===0 && !endNotified && (Date.now()-startTime)>5000){
-      setTimeout(function(){
-        if(document.querySelectorAll('video').length===0){
-          notifyEnd();
-        }
-      },3000);
-    }
-  }
-
-  /* Approach 1b: listen for Daily.co left-meeting event inside WebView */
-  window.addEventListener('message',function(e){
-    try{
-      var d=typeof e.data==='string'?JSON.parse(e.data):e.data;
-      if(d&&(d.action==='left-meeting'||d.action==='meeting-ended')){
-        notifyEnd();
-      }
-    }catch(err){}
-  });
-
-  setInterval(check,1500);
-  true;
-})();
-`;
 
 export default function CallScreen() {
   const router = useRouter();
@@ -169,7 +122,7 @@ export default function CallScreen() {
      */
     function scheduleToDestNode(samples: Float32Array) {
       if (!audioCtx || !destNode || destroyed) return;
-      const sr = elAgent.outputSampleRate || 16000;
+      const sr = elAgent.outputSampleRate || 24000;
       const abuf = audioCtx.createBuffer(1, samples.length, sr);
       abuf.copyToChannel(new Float32Array(samples), 0);
       const src = audioCtx.createBufferSource();
@@ -282,7 +235,7 @@ export default function CallScreen() {
                   properties: {
                     modality: 'audio',
                     audio: base64Audio,
-                    sample_rate: elAgent.outputSampleRate || 16000,
+                    sample_rate: elAgent.outputSampleRate || 24000,
                     inference_id: `el-${eventId}`,
                     done: true,
                   },
@@ -339,9 +292,11 @@ export default function CallScreen() {
     async function startMicCapture(frame: any) {
       try {
         micStream = await navigator.mediaDevices.getUserMedia({
-          audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true },
+          audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
         });
-        audioCtx = new AudioContext({ sampleRate: micStream.getAudioTracks()[0].getSettings().sampleRate ?? 48000 });
+        // Use native browser sample rate — Web Audio resamples automatically
+        // when AudioBuffers use a different rate (e.g. 24kHz for ElevenLabs output)
+        audioCtx = new AudioContext();
         nextPlayTime = audioCtx.currentTime;
         micSource = audioCtx.createMediaStreamSource(micStream);
 
@@ -458,7 +413,14 @@ export default function CallScreen() {
           />
         ) : (
           <WebView
-            source={{ uri: conversationUrl }}
+            source={{
+              html: buildCallPageHtml({
+                conversationUrl: conversationUrl!,
+                elevenLabsAgentId: process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID ?? '',
+                conversationId: conversationId ?? '',
+              }),
+              baseUrl: 'https://daily.co',
+            }}
             style={StyleSheet.absoluteFill}
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
@@ -469,15 +431,8 @@ export default function CallScreen() {
             androidHardwareAccelerationDisabled={false}
             setSupportMultipleWindows={false}
             onPermissionRequest={(req: any) => req.grant(req.resources)}
-            injectedJavaScript={INJECT_JS}
             onMessage={handleMessage}
             onLoadEnd={() => setIsConnecting(false)}
-            onNavigationStateChange={(navState: any) => {
-              const url = (navState.url || '').toLowerCase();
-              if (url && !url.includes('daily.co') && !url.includes('tavus')) {
-                handleLeave();
-              }
-            }}
             onError={(e: any) => console.warn('[WebView]', e.nativeEvent?.description)}
           />
         )
