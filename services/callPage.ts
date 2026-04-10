@@ -92,8 +92,7 @@ export function buildCallPageHtml(params: {
       return btoa(bin);
     }
     // ── ElevenLabs Agent ──
-    // Audio plays through Tavus participant track in Daily (echo mode).
-    // No direct audioCtx.destination playback — avoids double audio.
+    // User hears audio only through Tavus echo playback in Daily room.
     function connectAgent() {
       console.log('[EL] Connecting agent...');
       if (!AGENT_ID) { setStatus('No agent ID'); return; }
@@ -113,6 +112,7 @@ export function buildCallPageHtml(params: {
             console.log('[EL] Event:', msg.type);
           }
           if (msg.type === 'audio' && msg.audio_event && msg.audio_event.audio_base_64) {
+            // Accumulate for Tavus echo lip-sync
             turnChunks.push(msg.audio_event.audio_base_64);
             // Reset 800ms silence timer — fires when audio stops arriving
             if (turnTimer) clearTimeout(turnTimer);
@@ -238,6 +238,32 @@ export function buildCallPageHtml(params: {
       frame.on('joined-meeting', function() {
         console.log('[EL] Daily joined-meeting');
         setStatus('Joined — connecting agent...');
+
+        // Mute Tavus participant audio after a short delay so user
+        // only hears Path A (ElevenLabs direct). Path B (echo) drives
+        // lip-sync animation only.
+        setTimeout(function() {
+          var mediaEls = document.querySelectorAll('video, audio');
+          for (var i = 0; i < mediaEls.length; i++) {
+            mediaEls[i].muted = true;
+            mediaEls[i].volume = 0;
+          }
+          console.log('[EL] Muted', mediaEls.length, 'media elements');
+        }, 2000);
+
+        // Observe new media elements and mute them too
+        var observer = new MutationObserver(function() {
+          var els = document.querySelectorAll(
+            'video:not([data-el-muted]), audio:not([data-el-muted])'
+          );
+          for (var i = 0; i < els.length; i++) {
+            els[i].muted = true;
+            els[i].volume = 0;
+            els[i].setAttribute('data-el-muted', '1');
+          }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+
         connectAgent();
       });
 
