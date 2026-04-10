@@ -41,10 +41,16 @@ export default function CallScreen() {
     router.replace({ pathname: '/call-ended', params: { duration: String(secs) } });
   }, [callActive, conversationId, router]);
 
-  // Native: receive call-ended from injected JS
+  // Native: receive messages from WebView
   const handleMessage = useCallback((event: any) => {
-    if (event.nativeEvent?.data === 'call-ended') {
+    const msg = event.nativeEvent?.data;
+    if (!msg) return;
+    if (msg === 'call-ended') {
       handleLeave();
+    } else if (typeof msg === 'string' && msg.startsWith('LOG:')) {
+      console.log('[WebView]', msg.slice(4));
+    } else if (typeof msg === 'string' && msg.startsWith('WARN:')) {
+      console.warn('[WebView]', msg.slice(5));
     }
   }, [handleLeave]);
 
