@@ -66,6 +66,8 @@ export default function CallScreen() {
     let micSource: MediaStreamAudioSourceNode | null = null;
     // Gapless playback: tracks the next scheduled time for destNode output
     let nextPlayTime = 0;
+    let turnChunks: Float32Array[] = [];
+    let turnTimer: ReturnType<typeof setTimeout> | null = null;
 
     const agentId = process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID ?? '';
 
@@ -222,43 +224,58 @@ export default function CallScreen() {
               return;
             }
 
-            elAgent.onAudioOutput((base64Audio, eventId) => {
+            elAgent.onAudioOutput((base64Audio) => {
               if (destroyed) return;
-
-              // Decode PCM and schedule into destNode for gapless playback.
-              // Audio flows: destNode → Daily custom track → Tavus animates
-              // → user hears audio through the Tavus participant track.
-              // No direct local playback — avoids double audio.
               const samples = base64PcmToFloat32(base64Audio);
+              // Local playback
               scheduleToDestNode(samples);
-
-              // Also send echo event as the primary lip-sync mechanism
-              try {
-                frame.sendAppMessage({
-                  message_type: 'conversation',
-                  event_type: 'conversation.echo',
-                  conversation_id: conversationId ?? '',
-                  properties: {
-                    modality: 'audio',
-                    audio: base64Audio,
-                    sample_rate: elAgent.outputSampleRate || 24000,
-                    inference_id: `el-${eventId}`,
-                    done: true,
-                  },
-                }, '*');
-              } catch (err) {
-                console.warn('[Tavus] Failed to send echo event:', err);
-              }
-            });
-
-            elAgent.onAgentResponse((text) => {
-              console.log('[ElevenLabs] Agent:', text.slice(0, 120));
-              // New response starting — reset queue so chunks schedule fresh
-              resetPlaybackQueue();
+              // Accumulate for Tavus echo lip-sync
+              turnChunks.push(samples);
+              if (turnTimer) clearTimeout(turnTimer);
+              turnTimer = setTimeout(() => {
+                if (turnChunks.length === 0 || !callFrameRef.current) {
+                  turnChunks = [];
+                  return;
+                }
+                const sr = elAgent.outputSampleRate || 24000;
+                const totalLen = turnChunks.reduce((s, c) => s + c.length, 0);
+                const combined = new Float32Array(totalLen);
+                let offset = 0;
+                for (const c of turnChunks) { combined.set(c, offset); offset += c.length; }
+                const pcm = new ArrayBuffer(combined.length * 2);
+                const view = new DataView(pcm);
+                for (let i = 0; i < combined.length; i++) {
+                  const s = Math.max(-1, Math.min(1, combined[i]));
+                  view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+                }
+                const bytes = new Uint8Array(pcm);
+                let bin = '';
+                for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+                const b64 = btoa(bin);
+                try {
+                  callFrameRef.current.sendAppMessage({
+                    message_type: 'conversation',
+                    event_type: 'conversation.echo',
+                    conversation_id: conversationId ?? '',
+                    properties: {
+                      modality: 'audio',
+                      audio: b64,
+                      sample_rate: sr,
+                      done: 'true',
+                    },
+                  }, '*');
+                  console.log('[Tavus Echo] Sent, duration:', (totalLen / sr).toFixed(2) + 's');
+                } catch (e) {
+                  console.warn('[Tavus Echo] Failed:', e);
+                }
+                turnChunks = [];
+              }, 800);
             });
 
             elAgent.onInterruption(() => {
               console.log('[ElevenLabs] Interruption — resetting audio queue');
+              if (turnTimer) { clearTimeout(turnTimer); turnTimer = null; }
+              turnChunks = [];
               resetPlaybackQueue();
             });
 
@@ -379,8 +396,10 @@ export default function CallScreen() {
         destNode = null;
       }
 
-      // Reset gapless scheduler
+      // Reset gapless scheduler and turn accumulation
       nextPlayTime = 0;
+      if (turnTimer) { clearTimeout(turnTimer); turnTimer = null; }
+      turnChunks = [];
 
       // Destroy Daily frame
       if (callFrameRef.current) {
