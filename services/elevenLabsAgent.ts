@@ -73,6 +73,10 @@ export class ElevenLabsAgent {
     this._onDisconnected = cb;
   }
 
+  onTranscript(cb: TranscriptCallback): void {
+    this._onTranscript = cb;
+  }
+
   disconnect(): void {
     this.destroyed = true;
     this._clearTimers();
@@ -170,11 +174,21 @@ export class ElevenLabsAgent {
       }
 
       case 'agent_response': {
-        const text = data.agent_response_event?.agent_response;
+        const text = data.agent_response_event?.agent_response
+          ?? data.response ?? data.text ?? '';
         if (text) {
           console.log('[ElevenLabs] Agent response:', text.slice(0, 80));
           this._onAgentResponse?.(text);
+          this._onTranscript?.(text, true, 'agent');
         }
+        break;
+      }
+
+      case 'agent_response_correction':
+      case 'transcript': {
+        const text = data.transcript_event?.transcript ?? data.transcript ?? '';
+        const speaker: 'user' | 'agent' = data.role === 'user' ? 'user' : 'agent';
+        if (text) this._onTranscript?.(text, true, speaker);
         break;
       }
 
@@ -195,10 +209,13 @@ export class ElevenLabsAgent {
         break;
       }
 
-      case 'user_transcript': {
-        const transcript = data.user_transcription_event?.user_transcript;
+      case 'user_transcript':
+      case 'user_transcription': {
+        const transcript = data.user_transcription_event?.user_transcript
+          ?? data.transcript ?? data.text ?? '';
         if (transcript) {
           console.log('[ElevenLabs] User said:', transcript.slice(0, 80));
+          this._onTranscript?.(transcript, true, 'user');
         }
         break;
       }

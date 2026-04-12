@@ -37,18 +37,27 @@ export default function CallScreen() {
   const [userCamOff, setUserCamOff] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [splitView, setSplitView] = useState(false);
+  const [preJoinMicMuted, setPreJoinMicMuted] = useState(false);
+  const [preJoinCamOff, setPreJoinCamOff] = useState(false);
+  const [userSpeaking, setUserSpeaking] = useState(false);
+  const [captionsOn, setCaptionsOn] = useState(false);
+  const [captions, setCaptions] = useState<Array<{ id: number; speaker: 'user' | 'agent'; text: string }>>([]);
 
   const micMutedRef = useRef(false);
   const selectedMicRef = useRef<string>('');
   const selectedSpeakerRef = useRef<string>('');
   const startTimeRef = useRef(Date.now());
+  const captionIdRef = useRef(0);
+  const speakingRafRef = useRef<number>(0);
 
   // Web refs
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const cameraPreviewRef = useRef<HTMLVideoElement>(null);
   const userCamRef = useRef<HTMLVideoElement>(null);
+  const splitVideoRef = useRef<HTMLVideoElement>(null);
   const userCamStreamRef = useRef<MediaStream | null>(null);
   const pipRef = useRef<HTMLDivElement>(null);
+  const pipPosRef = useRef<{ right: number; bottom: number }>({ right: 16, bottom: 112 });
   const micLevelRef = useRef<HTMLDivElement>(null);
   const callFrameRef = useRef<any>(null);
   const preJoinCamStreamRef = useRef<MediaStream | null>(null);
@@ -71,7 +80,7 @@ export default function CallScreen() {
   const handleMessage = useCallback((event: any) => {
     const msg = event.nativeEvent?.data;
     if (!msg) return;
-    if (msg === 'call-ended') {
+    if (msg === 'call-ended' || msg === 'go-back') {
       handleLeave();
     } else if (typeof msg === 'string' && msg.startsWith('LOG:')) {
       console.log('[WebView]', msg.slice(4));
@@ -92,6 +101,16 @@ export default function CallScreen() {
         70% { box-shadow: 0 0 0 24px rgba(0,212,170,0); }
         100% { box-shadow: 0 0 0 0 rgba(0,212,170,0); }
       }
+      @keyframes connxn-speaking-ring {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+        50% { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+      }
+      @keyframes connxn-caption-in {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .connxn-speaking { animation: connxn-speaking-ring 1s ease infinite; }
+      .connxn-caption { animation: connxn-caption-in 0.2s ease; }
       select.connxn-select {
         -webkit-appearance: none; appearance: none;
         background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2394a3b8' stroke-width='2' viewBox='0 0 24 24'><polyline points='6 9 12 15 18 9'/></svg>");
@@ -111,7 +130,10 @@ export default function CallScreen() {
     let destroyed = false;
     let rafId = 0;
 
-    // Camera
+    // Camera (skip if pre-join camera is toggled off)
+    if (preJoinCamOff) {
+      setCamReady(false);
+    } else {
     const camConstraints: MediaStreamConstraints = {
       video: selectedCamera
         ? { deviceId: { exact: selectedCamera } }
@@ -139,6 +161,7 @@ export default function CallScreen() {
         } catch {}
       })
       .catch(() => setCamReady(false));
+    }
 
     // Mic analyser
     const micConstraints: MediaStreamConstraints = {
@@ -198,7 +221,7 @@ export default function CallScreen() {
         preJoinCtxRef.current = null;
       }
     };
-  }, [stage, selectedCamera, selectedMic]);
+  }, [stage, selectedCamera, selectedMic, preJoinCamOff]);
 
   // User PiP camera (in-call only)
   useEffect(() => {
@@ -217,6 +240,9 @@ export default function CallScreen() {
         if (userCamRef.current) {
           userCamRef.current.srcObject = stream;
         }
+        if (splitVideoRef.current) {
+          splitVideoRef.current.srcObject = stream;
+        }
       })
       .catch(() => setUserCamOff(true));
 
@@ -229,28 +255,51 @@ export default function CallScreen() {
     };
   }, [stage, userCamOff, selectedCamera]);
 
-  // PiP drag (web, in-call only)
+  // PiP drag using right/bottom (web, in-call only, NOT in split view)
   useEffect(() => {
     if (Platform.OS !== 'web' || stage !== 'incall') return;
     const pip = pipRef.current;
     if (!pip) return;
 
-    let dragging = false;
-    let dragX = 0, dragY = 0, initX = 0, initY = 0;
+    if (splitView) {
+      // No drag in split mode — clear inline positioning so flex layout works
+      pip.style.transform = 'none';
+      return;
+    }
+
+    // Restore saved position when returning to normal view
+    pip.style.right = pipPosRef.current.right + 'px';
+    pip.style.bottom = pipPosRef.current.bottom + 'px';
+    pip.style.left = 'auto';
+    pip.style.top = 'auto';
+    pip.style.transform = 'none';
+
+    let isDragging = false;
+    let startMouseX = 0, startMouseY = 0;
+    let startRight = pipPosRef.current.right;
+    let startBottom = pipPosRef.current.bottom;
 
     const onDown = (e: MouseEvent) => {
-      dragging = true;
-      initX = e.clientX - dragX;
-      initY = e.clientY - dragY;
+      isDragging = true;
+      startMouseX = e.clientX;
+      startMouseY = e.clientY;
+      const rect = pip.getBoundingClientRect();
+      startRight = window.innerWidth - rect.right;
+      startBottom = window.innerHeight - rect.bottom;
       e.preventDefault();
     };
     const onMove = (e: MouseEvent) => {
-      if (!dragging) return;
-      dragX = e.clientX - initX;
-      dragY = e.clientY - initY;
-      pip.style.transform = `translate(${dragX}px, ${dragY}px)`;
+      if (!isDragging) return;
+      const dx = e.clientX - startMouseX;
+      const dy = e.clientY - startMouseY;
+      const rect = pip.getBoundingClientRect();
+      const newRight = Math.max(8, Math.min(window.innerWidth - rect.width - 8, startRight - dx));
+      const newBottom = Math.max(8, Math.min(window.innerHeight - rect.height - 8, startBottom - dy));
+      pip.style.right = newRight + 'px';
+      pip.style.bottom = newBottom + 'px';
+      pipPosRef.current = { right: newRight, bottom: newBottom };
     };
-    const onUp = () => { dragging = false; };
+    const onUp = () => { isDragging = false; };
 
     pip.addEventListener('mousedown', onDown);
     document.addEventListener('mousemove', onMove);
@@ -260,7 +309,16 @@ export default function CallScreen() {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
-  }, [stage]);
+  }, [stage, splitView]);
+
+  // Reattach user cam stream to whichever video element is mounted
+  useEffect(() => {
+    if (Platform.OS !== 'web' || stage !== 'incall') return;
+    const stream = userCamStreamRef.current;
+    if (!stream) return;
+    if (userCamRef.current) userCamRef.current.srcObject = stream;
+    if (splitVideoRef.current) splitVideoRef.current.srcObject = stream;
+  }, [stage, splitView, userCamOff]);
 
   // Call timer
   useEffect(() => {
@@ -283,9 +341,24 @@ export default function CallScreen() {
     let scriptNode: ScriptProcessorNode | null = null;
     let micSource: MediaStreamAudioSourceNode | null = null;
     let destNode: MediaStreamAudioDestinationNode | null = null;
+    let micAnalyser: AnalyserNode | null = null;
     let scheduledUntil = 0;
     let turnChunks: Float32Array[] = [];
     let turnTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Register transcript callback early so we don't miss any captions.
+    // Always store to state — render layer decides whether to display.
+    elAgent.onTranscript((text, _isFinal, speaker) => {
+      if (!text || !text.trim()) return;
+      const id = ++captionIdRef.current;
+      setCaptions((prev) => {
+        const next = [...prev, { id, speaker, text }];
+        return next.slice(-4);
+      });
+      setTimeout(() => {
+        setCaptions((prev) => prev.filter((c) => c.id !== id));
+      }, 6000);
+    });
 
     const agentId = process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID ?? '';
 
@@ -383,6 +456,23 @@ export default function CallScreen() {
 
         micSource.connect(scriptNode);
         scriptNode.connect(audioCtx.destination);
+
+        // Voice activity analyser (for "user speaking" indicator)
+        micAnalyser = audioCtx.createAnalyser();
+        micAnalyser.fftSize = 256;
+        micSource.connect(micAnalyser);
+        const speakingData = new Uint8Array(micAnalyser.frequencyBinCount);
+        const detectSpeaking = () => {
+          if (!micAnalyser || destroyed) return;
+          micAnalyser.getByteFrequencyData(speakingData);
+          let sum = 0;
+          for (let i = 0; i < 32; i++) sum += speakingData[i];
+          const level = sum / (32 * 255);
+          setUserSpeaking(level > 0.08 && !micMutedRef.current);
+          speakingRafRef.current = requestAnimationFrame(detectSpeaking);
+        };
+        speakingRafRef.current = requestAnimationFrame(detectSpeaking);
+
         console.log('[Audio] Mic capture started at', audioCtx.sampleRate, 'Hz');
       } catch (err) {
         console.error('[Audio] Failed to start mic capture:', err);
@@ -566,6 +656,9 @@ export default function CallScreen() {
       destroyed = true;
       elAgent.disconnect();
 
+      if (speakingRafRef.current) { cancelAnimationFrame(speakingRafRef.current); speakingRafRef.current = 0; }
+      if (micAnalyser) { try { micAnalyser.disconnect(); } catch {} micAnalyser = null; }
+
       if (scriptNode) { scriptNode.disconnect(); scriptNode = null; }
       if (micSource) { micSource.disconnect(); micSource = null; }
       if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
@@ -603,13 +696,17 @@ export default function CallScreen() {
       preJoinCtxRef.current.close().catch(() => {});
       preJoinCtxRef.current = null;
     }
+    // Carry over pre-join toggles into the call
+    micMutedRef.current = preJoinMicMuted;
+    setMicMuted(preJoinMicMuted);
+    setUserCamOff(preJoinCamOff);
     setStage('connecting');
     try {
       callFrameRef.current.join({ url: conversationUrl });
     } catch (err) {
       console.error('[Daily] join failed:', err);
     }
-  }, [conversationUrl]);
+  }, [conversationUrl, preJoinMicMuted, preJoinCamOff]);
 
   const toggleMic = useCallback(() => {
     const next = !micMutedRef.current;
@@ -645,6 +742,26 @@ export default function CallScreen() {
 
   const toggleSettings = useCallback(() => setShowSettings((p) => !p), []);
   const toggleSplitView = useCallback(() => setSplitView((p) => !p), []);
+  const toggleCaptions = useCallback(() => setCaptionsOn((p) => !p), []);
+  const togglePreJoinMic = useCallback(() => setPreJoinMicMuted((p) => !p), []);
+  const togglePreJoinCam = useCallback(() => setPreJoinCamOff((p) => !p), []);
+
+  const handleBack = useCallback(() => {
+    // Stop pre-join streams before navigating
+    if (preJoinCamStreamRef.current) {
+      preJoinCamStreamRef.current.getTracks().forEach((t) => t.stop());
+      preJoinCamStreamRef.current = null;
+    }
+    if (preJoinMicStreamRef.current) {
+      preJoinMicStreamRef.current.getTracks().forEach((t) => t.stop());
+      preJoinMicStreamRef.current = null;
+    }
+    if (preJoinCtxRef.current) {
+      preJoinCtxRef.current.close().catch(() => {});
+      preJoinCtxRef.current = null;
+    }
+    router.replace('/');
+  }, [router]);
 
   // ───── render ─────
 
@@ -704,6 +821,35 @@ export default function CallScreen() {
           } as any}
         />
 
+        {/* Floating back button (top-left of viewport) — pre-join only */}
+        {stage === 'prejoin' && (
+          <div
+            onClick={handleBack}
+            style={{
+              position: 'absolute',
+              top: 16,
+              left: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              borderRadius: 20,
+              background: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.8)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              color: theme.textPrimary,
+              cursor: 'pointer',
+              userSelect: 'none',
+              fontSize: 14,
+              fontWeight: 500,
+              zIndex: 100,
+            } as any}
+          >
+            <Ionicons name="arrow-back" size={18} color={theme.textPrimary} />
+            <span>Back</span>
+          </div>
+        )}
+
         {/* ───────── PRE-JOIN ───────── */}
         {stage === 'prejoin' && (
           <div style={{
@@ -713,6 +859,7 @@ export default function CallScreen() {
             flexDirection: 'row',
             alignItems: 'stretch',
             padding: 24,
+            paddingTop: 64,
             gap: 24,
             overflow: 'hidden',
             boxSizing: 'border-box',
@@ -767,7 +914,7 @@ export default function CallScreen() {
                   )}
                   <div style={{
                     position: 'absolute',
-                    bottom: 12,
+                    top: 12,
                     left: 12,
                     color: 'white',
                     fontSize: 12,
@@ -776,6 +923,52 @@ export default function CallScreen() {
                     borderRadius: 8,
                     backdropFilter: 'blur(8px)',
                   } as any}>You</div>
+
+                  {/* Mic mute overlay (bottom-left) */}
+                  <div
+                    onClick={togglePreJoinMic}
+                    title="Mute mic before joining"
+                    style={{
+                      position: 'absolute',
+                      bottom: 12,
+                      left: 12,
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      background: preJoinMicMuted ? '#ef4444' : 'rgba(0,0,0,0.55)',
+                      backdropFilter: 'blur(8px)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    } as any}
+                  >
+                    <Ionicons name={preJoinMicMuted ? 'mic-off' : 'mic'} size={18} color="white" />
+                  </div>
+
+                  {/* Camera off overlay (bottom-right) */}
+                  <div
+                    onClick={togglePreJoinCam}
+                    title="Turn off camera before joining"
+                    style={{
+                      position: 'absolute',
+                      bottom: 12,
+                      right: 12,
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      background: preJoinCamOff ? '#ef4444' : 'rgba(0,0,0,0.55)',
+                      backdropFilter: 'blur(8px)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    } as any}
+                  >
+                    <Ionicons name={preJoinCamOff ? 'videocam-off' : 'videocam'} size={18} color="white" />
+                  </div>
                 </div>
 
               {/* Device pickers row (camera + mic) */}
@@ -996,7 +1189,7 @@ export default function CallScreen() {
               } as any}>
                 {!userCamOff ? (
                   <video
-                    ref={userCamRef as any}
+                    ref={splitVideoRef as any}
                     autoPlay
                     playsInline
                     muted
@@ -1042,7 +1235,10 @@ export default function CallScreen() {
                   borderRadius: 14,
                   overflow: 'hidden',
                   background: '#1e293b',
-                  border: '2px solid rgba(255,255,255,0.2)',
+                  border: userSpeaking && !micMuted
+                    ? '2px solid #22c55e'
+                    : '2px solid rgba(255,255,255,0.2)',
+                  transition: 'border-color 0.1s ease',
                   cursor: 'move',
                   zIndex: 5,
                   userSelect: 'none',
@@ -1290,6 +1486,7 @@ export default function CallScreen() {
                 icon={micMuted ? 'mic-off' : 'mic'}
                 label={micMuted ? 'Unmute' : 'Mic'}
                 danger={micMuted}
+                speaking={userSpeaking && !micMuted}
               />
               <CtrlButton
                 onClick={toggleCamera}
@@ -1307,10 +1504,12 @@ export default function CallScreen() {
                 bg={colors.danger}
               />
               <CtrlButton
-                onClick={toggleSettings}
-                active
-                icon="settings-outline"
-                label="Settings"
+                onClick={toggleCaptions}
+                active={captionsOn}
+                icon="chatbubble-ellipses"
+                label="CC"
+                bg={captionsOn ? '#fff' : 'rgba(255,255,255,0.15)'}
+                iconColor={captionsOn ? '#0f172a' : 'white'}
               />
               <CtrlButton
                 onClick={toggleSplitView}
@@ -1318,7 +1517,54 @@ export default function CallScreen() {
                 icon={splitView ? 'expand-outline' : 'grid-outline'}
                 label={splitView ? 'Full' : 'Split'}
               />
+              <CtrlButton
+                onClick={toggleSettings}
+                active
+                icon="settings-outline"
+                label="Settings"
+              />
             </div>
+
+            {/* Caption overlay */}
+            {captionsOn && captions.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                bottom: 112,
+                left: 0,
+                right: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                alignItems: 'center',
+                padding: '0 48px',
+                pointerEvents: 'none',
+                zIndex: 9,
+              } as any}>
+                {captions.map((c) => (
+                  <div
+                    key={c.id}
+                    className="connxn-caption"
+                    style={{
+                      background: 'rgba(0,0,0,0.75)',
+                      borderRadius: 8,
+                      padding: '6px 12px',
+                      maxWidth: 600,
+                      fontSize: 15,
+                      lineHeight: 1.4,
+                      color: 'white',
+                    } as any}
+                  >
+                    <span style={{
+                      color: c.speaker === 'user' ? '#22c55e' : '#818cf8',
+                      fontWeight: 600,
+                    } as any}>
+                      {c.speaker === 'user' ? 'You: ' : 'AI: '}
+                    </span>
+                    <span>{c.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -1365,12 +1611,15 @@ function CtrlButton(props: {
   label: string;
   size?: number;
   bg?: string;
+  iconColor?: string;
   danger?: boolean;
   disabled?: boolean;
+  speaking?: boolean;
 }) {
   const size = props.size ?? 56;
   const bg = props.bg
     ?? (props.danger ? '#ef4444' : 'rgba(255,255,255,0.15)');
+  const iconColor = props.iconColor ?? 'white';
   return (
     <div style={{
       display: 'flex',
@@ -1382,7 +1631,7 @@ function CtrlButton(props: {
       userSelect: 'none',
     } as any}>
       <div
-        className="connxn-btn-press"
+        className={`connxn-btn-press${props.speaking ? ' connxn-speaking' : ''}`}
         onClick={props.disabled ? undefined : props.onClick}
         style={{
           width: size,
@@ -1396,7 +1645,7 @@ function CtrlButton(props: {
           backdropFilter: 'blur(10px)',
         } as any}
       >
-        <Ionicons name={props.icon} size={size * 0.42} color="white" />
+        <Ionicons name={props.icon} size={size * 0.42} color={iconColor} />
       </div>
       <span style={{
         color: 'rgba(255,255,255,0.75)',

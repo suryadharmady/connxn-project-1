@@ -143,6 +143,53 @@ export function buildCallPageHtml(params: {
       animation:spin 0.8s linear infinite; margin-top:8px;
     }
     @keyframes spin { to { transform:rotate(360deg); } }
+    @keyframes speaking-ring {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+      50% { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+    }
+    .speaking { animation: speaking-ring 1s ease infinite; }
+    @keyframes fadeInUp {
+      from { opacity:0; transform:translateY(8px); }
+      to { opacity:1; transform:translateY(0); }
+    }
+
+    /* Back button (pre-join top-left) */
+    #back-btn {
+      position:absolute; top:max(12px, env(safe-area-inset-top)); left:12px;
+      display:flex; align-items:center; gap:6px;
+      padding:8px 14px; border:none; cursor:pointer;
+      background:transparent; color:var(--text-primary);
+      font-size:14px; font-weight:500; z-index:30;
+    }
+    #back-btn svg { width:18px; height:18px; fill:none;
+      stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+    /* Pre-join camera overlay buttons */
+    .preview-btn {
+      position:absolute; bottom:12px;
+      width:40px; height:40px; border-radius:50%; border:none;
+      background:rgba(0,0,0,0.55); backdrop-filter:blur(8px);
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer;
+    }
+    .preview-btn.muted { background:#ef4444; }
+    .preview-btn svg { width:18px; height:18px; fill:none;
+      stroke:white; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    #preview-mic-btn { left:12px; }
+    #preview-cam-btn { right:12px; }
+
+    /* Captions overlay */
+    #captions-overlay {
+      display:none; position:absolute; bottom:104px; left:0; right:0;
+      flex-direction:column; gap:6px; align-items:center;
+      padding:0 16px; z-index:9; pointer-events:none;
+    }
+    .caption-line {
+      background:rgba(0,0,0,0.75); border-radius:8px;
+      padding:6px 12px; max-width:90%; font-size:14px;
+      color:white; line-height:1.4;
+      animation:fadeInUp 0.2s ease;
+    }
 
     /* ─ In-call ─ */
     #incall {
@@ -330,6 +377,10 @@ export function buildCallPageHtml(params: {
 
 <!-- ─ PRE-JOIN ─ -->
 <div id="prejoin">
+  <button id="back-btn" type="button">
+    <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Back
+  </button>
   <div class="brand">
     <div class="brand-avatar">&#x2728;</div>
     <div class="brand-title">Ready to join?</div>
@@ -353,6 +404,22 @@ export function buildCallPageHtml(params: {
       </svg>
     </button>
     <div id="camera-preview-label">You</div>
+
+    <button class="preview-btn" id="preview-mic-btn" type="button">
+      <svg id="preview-mic-icon" viewBox="0 0 24 24">
+        <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+        <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </button>
+
+    <button class="preview-btn" id="preview-cam-btn" type="button">
+      <svg id="preview-cam-icon" viewBox="0 0 24 24">
+        <polygon points="23 7 16 12 23 17 23 7"/>
+        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+      </svg>
+    </button>
   </div>
 
   <div class="mic-meter-wrap">
@@ -388,6 +455,9 @@ export function buildCallPageHtml(params: {
 <!-- ─ IN-CALL ─ -->
 <div id="incall">
   <video id="tavus-video" autoplay playsinline muted></video>
+
+  <!-- Captions overlay -->
+  <div id="captions-overlay"></div>
 
   <!-- User camera (PiP in normal view, full pane in split view) -->
   <div id="user-pip">
@@ -460,13 +530,13 @@ export function buildCallPageHtml(params: {
     </div>
 
     <div class="ctrl-col">
-      <button class="ctrl-btn" id="settings-btn">
+      <button class="ctrl-btn" id="cc-btn">
         <svg viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+          <rect x="2" y="5" width="20" height="14" rx="2"/>
+          <path d="M7 12h2M11 12h2M15 12h2"/>
         </svg>
       </button>
-      <span class="ctrl-label">Settings</span>
+      <span class="ctrl-label">CC</span>
     </div>
 
     <div class="ctrl-col">
@@ -614,6 +684,14 @@ export function buildCallPageHtml(params: {
         if (msg.type && msg.type !== 'audio' && msg.type !== 'ping') {
           console.log('[EL] Event:', msg.type);
         }
+        // User transcript caption
+        if (msg.type === 'user_transcript' && msg.user_transcription_event) {
+          addCaption('You', msg.user_transcription_event.user_transcript || '', '#22c55e');
+        }
+        // Agent transcript caption
+        if (msg.type === 'agent_response' && msg.agent_response_event) {
+          addCaption('AI', msg.agent_response_event.agent_response || '', '#818cf8');
+        }
         if (msg.type === 'audio' && msg.audio_event && msg.audio_event.audio_base_64) {
           // User hears via Tavus echo replay audio track (not direct playback).
           // Accumulate raw base64 chunks for the sendAppMessage echo.
@@ -709,6 +787,27 @@ export function buildCallPageHtml(params: {
       scriptNode.connect(silenceGain);
       silenceGain.connect(audioCtx.destination);
 
+      // Voice activity analyser for "user speaking" indicator
+      var micAnalyser = audioCtx.createAnalyser();
+      micAnalyser.fftSize = 256;
+      micSource.connect(micAnalyser);
+      var vaData = new Uint8Array(micAnalyser.frequencyBinCount);
+      setInterval(function() {
+        if (!micAnalyser) return;
+        micAnalyser.getByteFrequencyData(vaData);
+        var sum = 0;
+        for (var i = 0; i < 32; i++) sum += vaData[i];
+        var level = sum / (32 * 255);
+        var pip = document.getElementById('user-pip');
+        if (level > 0.08 && !micMuted) {
+          if (pip) pip.style.border = '2px solid #22c55e';
+          if (micBtn) micBtn.classList.add('speaking');
+        } else {
+          if (pip) pip.style.border = '2px solid rgba(255,255,255,0.2)';
+          if (micBtn) micBtn.classList.remove('speaking');
+        }
+      }, 100);
+
       if (window.ReactNativeWebView) {
         window.ReactNativeWebView.postMessage('mic-active');
       }
@@ -747,6 +846,60 @@ export function buildCallPageHtml(params: {
     facingMode = facingMode === 'user' ? 'environment' : 'user';
     startCameraPreview();
   });
+
+  // Back button
+  var backBtn = document.getElementById('back-btn');
+  if (backBtn) {
+    backBtn.addEventListener('click', function() {
+      stopPreJoinStreams();
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage('go-back');
+      }
+    });
+  }
+
+  // Pre-join mic mute toggle
+  var preJoinMicMuted = false;
+  var previewMicBtn = document.getElementById('preview-mic-btn');
+  var previewMicIcon = document.getElementById('preview-mic-icon');
+  if (previewMicBtn) {
+    previewMicBtn.addEventListener('click', function() {
+      preJoinMicMuted = !preJoinMicMuted;
+      previewMicBtn.classList.toggle('muted', preJoinMicMuted);
+      if (previewMicIcon) {
+        previewMicIcon.innerHTML = preJoinMicMuted
+          ? '<line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>'
+          : '<path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>';
+      }
+    });
+  }
+
+  // Pre-join camera off toggle
+  var preJoinCamOff = false;
+  var previewCamBtn = document.getElementById('preview-cam-btn');
+  var previewCamIcon = document.getElementById('preview-cam-icon');
+  if (previewCamBtn) {
+    previewCamBtn.addEventListener('click', function() {
+      preJoinCamOff = !preJoinCamOff;
+      previewCamBtn.classList.toggle('muted', preJoinCamOff);
+      if (preJoinCamOff) {
+        if (preJoinCamStream) {
+          preJoinCamStream.getTracks().forEach(function(t) { t.stop(); });
+          preJoinCamStream = null;
+        }
+        camPreview.style.display = 'none';
+        camOffEl.style.display = 'flex';
+      } else {
+        camOffEl.style.display = 'none';
+        startCameraPreview();
+      }
+      if (previewCamIcon) {
+        previewCamIcon.innerHTML = preJoinCamOff
+          ? '<line x1="1" y1="1" x2="23" y2="23"/><path d="M21 21H3a2 2 0 01-2-2V8a2 2 0 012-2h3m3-3h6l2 3h4a2 2 0 012 2v9.34"/>'
+          : '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>';
+      }
+    });
+  }
 
   // Pre-join mic analyser
   navigator.mediaDevices.getUserMedia({ audio: true })
@@ -874,11 +1027,50 @@ export function buildCallPageHtml(params: {
 
   // ── JOIN BUTTON ──
   joinBtn.addEventListener('click', function() {
+    // Carry over pre-join toggles
+    micMuted = preJoinMicMuted;
+    if (micMuted) {
+      micBtn.className = 'ctrl-btn muted';
+      var micLabel = document.getElementById('mic-label');
+      if (micLabel) micLabel.textContent = 'Muted';
+    }
+    if (preJoinCamOff) {
+      userCamOff = true;
+      camBtn.className = 'ctrl-btn muted';
+    }
     stopPreJoinStreams();
     prejoinEl.style.display = 'none';
     connectEl.style.display = 'flex';
     joinDaily();
   });
+
+  // ── CAPTIONS TOGGLE ──
+  var captionsOn = false;
+  var captionsOverlay = document.getElementById('captions-overlay');
+  var ccBtn = document.getElementById('cc-btn');
+  if (ccBtn) {
+    ccBtn.addEventListener('click', function() {
+      captionsOn = !captionsOn;
+      ccBtn.classList.toggle('muted', captionsOn);
+      if (captionsOverlay) {
+        captionsOverlay.style.display = captionsOn ? 'flex' : 'none';
+      }
+    });
+  }
+  function addCaption(speaker, text, color) {
+    if (!text || !text.trim() || !captionsOn || !captionsOverlay) return;
+    var el = document.createElement('div');
+    el.className = 'caption-line';
+    el.innerHTML = '<span style="color:' + color + ';font-weight:600">'
+      + speaker + ': </span>' + text;
+    captionsOverlay.appendChild(el);
+    while (captionsOverlay.children.length > 4) {
+      captionsOverlay.removeChild(captionsOverlay.firstChild);
+    }
+    setTimeout(function() {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 6000);
+  }
 
   // ── LEAVE BUTTON ──
   leaveBtn.addEventListener('click', function() {
@@ -916,9 +1108,9 @@ export function buildCallPageHtml(params: {
     settingsSheet.classList.remove('open');
     settingsBackdrop.classList.remove('open');
   }
-  settingsBtn.addEventListener('click', openSettings);
-  settingsClose.addEventListener('click', closeSettings);
-  settingsBackdrop.addEventListener('click', closeSettings);
+  if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
+  if (settingsClose) settingsClose.addEventListener('click', closeSettings);
+  if (settingsBackdrop) settingsBackdrop.addEventListener('click', closeSettings);
 
   function populateDeviceSelects() {
     navigator.mediaDevices.enumerateDevices().then(function(devices) {
