@@ -710,30 +710,32 @@ export default function CallScreen() {
             position: 'absolute',
             inset: 0,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            flexDirection: 'row',
+            alignItems: 'stretch',
             padding: 24,
-            overflow: 'auto',
+            gap: 24,
+            overflow: 'hidden',
+            boxSizing: 'border-box',
           } as any}>
+            {/* LEFT: camera preview fills column */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr',
-              gap: 32,
-              maxWidth: 960,
-              width: '100%',
-              alignItems: 'center',
+              flex: '0 0 55%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              minWidth: 0,
+              minHeight: 0,
             } as any}>
-              {/* Left: camera preview + device pickers */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 } as any}>
-                <div style={{
-                  width: '100%',
-                  aspectRatio: '16/9',
-                  borderRadius: 24,
-                  overflow: 'hidden',
-                  background: '#0b1220',
-                  position: 'relative',
-                  border: `1px solid ${theme.border}`,
-                } as any}>
+              <div style={{
+                flex: 1,
+                minHeight: 0,
+                maxHeight: '65vh',
+                borderRadius: 16,
+                overflow: 'hidden',
+                background: '#0b1220',
+                position: 'relative',
+                border: `1px solid ${theme.border}`,
+              } as any}>
                   <video
                     ref={cameraPreviewRef as any}
                     autoPlay
@@ -776,142 +778,160 @@ export default function CallScreen() {
                   } as any}>You</div>
                 </div>
 
-                {/* Device pickers */}
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' } as any}>
-                  <div style={{ flex: 1, minWidth: 180 } as any}>
-                    <label style={{ color: theme.textSecondary, fontSize: 12, display: 'block', marginBottom: 6 } as any}>
-                      Camera
-                    </label>
-                    <select
-                      className="connxn-select"
-                      value={selectedCamera}
-                      onChange={(e) => onSelectCamera(e.target.value)}
-                      style={{
-                        width: '100%',
-                        height: 40,
-                        padding: '0 12px',
-                        borderRadius: 10,
-                        background: theme.inputBg,
-                        color: theme.textPrimary,
-                        border: `1px solid ${theme.border}`,
-                        fontSize: 13,
-                        cursor: 'pointer',
-                      } as any}
-                    >
-                      {cameras.length === 0 && <option value="">Default camera</option>}
-                      {cameras.map((c) => (
-                        <option key={c.deviceId} value={c.deviceId}>
-                          {c.label || `Camera (${c.deviceId.slice(0, 6)})`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 180 } as any}>
-                    <label style={{ color: theme.textSecondary, fontSize: 12, display: 'block', marginBottom: 6 } as any}>
-                      Microphone
-                    </label>
-                    <select
-                      className="connxn-select"
-                      value={selectedMic}
-                      onChange={(e) => onSelectMic(e.target.value)}
-                      style={{
-                        width: '100%',
-                        height: 40,
-                        padding: '0 12px',
-                        borderRadius: 10,
-                        background: theme.inputBg,
-                        color: theme.textPrimary,
-                        border: `1px solid ${theme.border}`,
-                        fontSize: 13,
-                        cursor: 'pointer',
-                      } as any}
-                    >
-                      {mics.length === 0 && <option value="">Default mic</option>}
-                      {mics.map((m) => (
-                        <option key={m.deviceId} value={m.deviceId}>
-                          {m.label || `Mic (${m.deviceId.slice(0, 6)})`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Mic level meter */}
-                <div>
-                  <div style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 6 } as any}>
-                    Microphone level
-                  </div>
-                  <div style={{
-                    width: '100%',
-                    height: 8,
+              {/* Device pickers row (camera + mic) */}
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 } as any}>
+                <select
+                  className="connxn-select"
+                  value={selectedCamera}
+                  onChange={(e) => onSelectCamera(e.target.value)}
+                  style={{
+                    flex: 1,
+                    height: 36,
+                    padding: '0 12px',
+                    borderRadius: 10,
                     background: theme.inputBg,
-                    borderRadius: 4,
-                    overflow: 'hidden',
+                    color: theme.textPrimary,
                     border: `1px solid ${theme.border}`,
-                  } as any}>
-                    <div
-                      ref={micLevelRef as any}
-                      style={{
-                        height: '100%',
-                        width: '0%',
-                        background: `linear-gradient(90deg, ${theme.accent}, ${theme.accentDark})`,
-                        transition: 'width 0.1s ease',
-                      } as any}
-                    />
-                  </div>
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    minWidth: 0,
+                  } as any}
+                >
+                  {cameras.length === 0 && <option value="">Default camera</option>}
+                  {cameras.map((c) => (
+                    <option key={c.deviceId} value={c.deviceId}>
+                      {c.label || `Camera (${c.deviceId.slice(0, 6)})`}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="connxn-select"
+                  value={selectedMic}
+                  onChange={(e) => onSelectMic(e.target.value)}
+                  style={{
+                    flex: 1,
+                    height: 36,
+                    padding: '0 12px',
+                    borderRadius: 10,
+                    background: theme.inputBg,
+                    color: theme.textPrimary,
+                    border: `1px solid ${theme.border}`,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    minWidth: 0,
+                  } as any}
+                >
+                  {mics.length === 0 && <option value="">Default mic</option>}
+                  {mics.map((m) => (
+                    <option key={m.deviceId} value={m.deviceId}>
+                      {m.label || `Mic (${m.deviceId.slice(0, 6)})`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* RIGHT: brand + join (vertically centered) */}
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 16,
+              textAlign: 'center',
+              minWidth: 0,
+            } as any}>
+              <div style={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 28,
+              } as any}>✨</div>
+              <div>
+                <div style={{ color: theme.textPrimary, fontSize: 22, fontWeight: 700 } as any}>
+                  Ready to join?
+                </div>
+                <div style={{ color: theme.textSecondary, fontSize: 14, marginTop: 4 } as any}>
+                  {CREATOR_NAME} · AI Video Call
                 </div>
               </div>
 
-              {/* Right: brand + join */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 16,
-                textAlign: 'center',
-              } as any}>
+              {/* Mic level meter */}
+              <div style={{ width: '100%', maxWidth: 360 } as any}>
+                <div style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 6, textAlign: 'center' } as any}>
+                  Microphone level
+                </div>
                 <div style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: '50%',
+                  width: '100%',
+                  height: 8,
+                  background: theme.inputBg,
+                  borderRadius: 4,
+                  overflow: 'hidden',
+                  border: `1px solid ${theme.border}`,
+                } as any}>
+                  <div
+                    ref={micLevelRef as any}
+                    style={{
+                      height: '100%',
+                      width: '0%',
+                      background: `linear-gradient(90deg, ${theme.accent}, ${theme.accentDark})`,
+                      transition: 'width 0.1s ease',
+                    } as any}
+                  />
+                </div>
+              </div>
+
+              {/* Device status */}
+              <div style={{ display: 'flex', gap: 16 } as any}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  color: camReady ? theme.accent : theme.danger, fontSize: 12,
+                } as any}>
+                  <Ionicons
+                    name={camReady ? 'videocam' : 'videocam-off'}
+                    size={14}
+                    color={camReady ? theme.accent : theme.danger}
+                  />
+                  <span>{camReady ? 'Camera ready' : 'Camera blocked'}</span>
+                </div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  color: micReady ? theme.accent : theme.danger, fontSize: 12,
+                } as any}>
+                  <Ionicons
+                    name={micReady ? 'mic' : 'mic-off'}
+                    size={14}
+                    color={micReady ? theme.accent : theme.danger}
+                  />
+                  <span>{micReady ? 'Mic ready' : 'Mic blocked'}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleJoinClick}
+                style={{
+                  width: '100%',
+                  maxWidth: 360,
+                  height: 52,
+                  border: 'none',
+                  cursor: 'pointer',
+                  borderRadius: 14,
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: '#fff',
                   background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 32,
-                } as any}>✨</div>
-                <div>
-                  <div style={{ color: theme.textPrimary, fontSize: 22, fontWeight: 700 } as any}>
-                    Ready to join?
-                  </div>
-                  <div style={{ color: theme.textSecondary, fontSize: 14, marginTop: 4 } as any}>
-                    {CREATOR_NAME} · AI Video Call
-                  </div>
-                </div>
-                <div style={{ color: theme.textMuted, fontSize: 13 } as any}>
-                  Make sure your camera and mic are set up
-                </div>
-                <button
-                  onClick={handleJoinClick}
-                  style={{
-                    width: '100%',
-                    maxWidth: 360,
-                    height: 52,
-                    border: 'none',
-                    cursor: 'pointer',
-                    borderRadius: 14,
-                    fontSize: 16,
-                    fontWeight: 700,
-                    color: '#fff',
-                    background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})`,
-                    boxShadow: `0 8px 24px ${isDark ? 'rgba(0,212,170,0.3)' : 'rgba(0,196,154,0.25)'}`,
-                  } as any}
-                >
-                  Join Now
-                </button>
-                <div style={{ color: theme.textMuted, fontSize: 12 } as any}>
-                  You'll join as a guest · Mic and camera only used during the call
-                </div>
+                  boxShadow: `0 8px 24px ${isDark ? 'rgba(0,212,170,0.3)' : 'rgba(0,196,154,0.25)'}`,
+                } as any}
+              >
+                Join Now
+              </button>
+              <div style={{ color: theme.textMuted, fontSize: 11, textAlign: 'center' } as any}>
+                You'll join as a guest · Mic and camera only used during the call
               </div>
             </div>
           </div>
@@ -1315,6 +1335,7 @@ export default function CallScreen() {
               conversationUrl: conversationUrl!,
               elevenLabsAgentId: process.env.EXPO_PUBLIC_ELEVENLABS_AGENT_ID ?? '',
               conversationId: conversationId ?? '',
+              isDarkMode: isDark,
             }),
             baseUrl: 'https://daily.co',
           }}

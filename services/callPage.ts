@@ -7,24 +7,27 @@ export function buildCallPageHtml(params: {
   conversationUrl: string;
   elevenLabsAgentId: string;
   conversationId: string;
+  isDarkMode: boolean;
 }): string {
-  const { conversationUrl, elevenLabsAgentId, conversationId } = params;
+  const { conversationUrl, elevenLabsAgentId, conversationId, isDarkMode } = params;
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <style>
-    /* ─ Theme (hardcoded to match app DarkColors) ─ */
+    /* ─ Theme (light/dark from React Native) ─ */
     :root {
-      --bg: #0F172A;
-      --card: rgba(30,41,59,0.7);
-      --card-border: rgba(255,255,255,0.08);
-      --accent: #00D4AA;
-      --accent-dark: #00B894;
-      --danger: #F87171;
-      --text-primary: #F1F5F9;
-      --text-secondary: #94A3B8;
-      --text-muted: #64748B;
+      --bg: ${isDarkMode ? '#0F172A' : '#F8FAFC'};
+      --card: ${isDarkMode ? 'rgba(30,41,59,0.7)' : 'rgba(255,255,255,0.9)'};
+      --card-border: ${isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'};
+      --accent: ${isDarkMode ? '#00D4AA' : '#00C49A'};
+      --accent-dark: ${isDarkMode ? '#00B894' : '#00A67E'};
+      --danger: ${isDarkMode ? '#F87171' : '#EF4444'};
+      --text-primary: ${isDarkMode ? '#F1F5F9' : '#0F172A'};
+      --text-secondary: ${isDarkMode ? '#94A3B8' : '#64748B'};
+      --text-muted: ${isDarkMode ? '#64748B' : '#94A3B8'};
+      --input-bg: ${isDarkMode ? '#1e293b' : '#FFFFFF'};
+      --preview-bg: ${isDarkMode ? '#0b1220' : '#e5e7eb'};
     }
     * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
     body { background:var(--bg); width:100vw; height:100vh; overflow:hidden;
@@ -55,7 +58,7 @@ export function buildCallPageHtml(params: {
     #camera-preview-wrap {
       width:100%; max-width:420px; aspect-ratio:16/9;
       border-radius:20px; overflow:hidden;
-      background:#0b1220;
+      background:var(--preview-bg);
       border:1px solid var(--card-border);
       position:relative;
     }
@@ -88,7 +91,7 @@ export function buildCallPageHtml(params: {
     .mic-meter-wrap { width:100%; max-width:420px; }
     .mic-meter-label { color:var(--text-secondary); font-size:12px; margin-bottom:6px; }
     .mic-meter {
-      width:100%; height:8px; background:#1e293b; border-radius:4px;
+      width:100%; height:8px; background:var(--input-bg); border-radius:4px;
       overflow:hidden; border:1px solid var(--card-border);
     }
     .mic-meter-fill {
@@ -536,7 +539,6 @@ export function buildCallPageHtml(params: {
 
   // ── Audio/agent state ──
   var audioCtx = null;
-  var nextPlayTime = 0;
   var ws = null;
   var frame = null;
   var turnChunks = [];
@@ -595,34 +597,6 @@ export function buildCallPageHtml(params: {
     for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
     return btoa(bin);
   }
-  function b64PcmToFloat32(b64) {
-    var bin = atob(b64);
-    var bytes = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    var view = new DataView(bytes.buffer);
-    var out = new Float32Array(bytes.length / 2);
-    for (var i = 0; i < out.length; i++) out[i] = view.getInt16(i * 2, true) / 0x8000;
-    return out;
-  }
-
-  // Path A — direct to speaker so user hears ElevenLabs voice immediately
-  function scheduleAudio(samples, sr) {
-    if (!audioCtx) return;
-    sr = sr || 24000;
-    var abuf = audioCtx.createBuffer(1, samples.length, sr);
-    abuf.copyToChannel(new Float32Array(samples), 0);
-
-    var now = audioCtx.currentTime;
-    if (nextPlayTime < now - 1.5) nextPlayTime = now + 0.05;
-    var startAt = Math.max(nextPlayTime, now + 0.01);
-    nextPlayTime = startAt + abuf.duration;
-
-    var srcA = audioCtx.createBufferSource();
-    srcA.buffer = abuf;
-    srcA.connect(audioCtx.destination);
-    srcA.start(startAt);
-  }
-
   // ── ElevenLabs Agent (unchanged) ──
   function connectAgent() {
     console.log('[EL] Connecting agent...');
@@ -641,10 +615,8 @@ export function buildCallPageHtml(params: {
           console.log('[EL] Event:', msg.type);
         }
         if (msg.type === 'audio' && msg.audio_event && msg.audio_event.audio_base_64) {
-          // Path A: decode and play directly for user
-          var samples = b64PcmToFloat32(msg.audio_event.audio_base_64);
-          scheduleAudio(samples, 24000);
-          // Accumulate raw base64 for Tavus lip-sync echo
+          // User hears via Tavus echo replay audio track (not direct playback).
+          // Accumulate raw base64 chunks for the sendAppMessage echo.
           turnChunks.push(msg.audio_event.audio_base_64);
           if (turnTimer) clearTimeout(turnTimer);
           turnTimer = setTimeout(function() {
@@ -659,7 +631,6 @@ export function buildCallPageHtml(params: {
           console.log('[EL] interruption, clearing', turnChunks.length, 'chunks');
           if (turnTimer) { clearTimeout(turnTimer); turnTimer = null; }
           turnChunks = [];
-          nextPlayTime = audioCtx ? audioCtx.currentTime : 0;
         }
         if (msg.type === 'ping' && msg.ping_event) {
           ws.send(JSON.stringify({ type: 'pong', event_id: msg.ping_event.event_id }));
@@ -722,7 +693,6 @@ export function buildCallPageHtml(params: {
     }).then(function(stream) {
       var nativeSR = stream.getAudioTracks()[0].getSettings().sampleRate || 48000;
       audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: nativeSR });
-      nextPlayTime = audioCtx.currentTime;
 
       var micSource = audioCtx.createMediaStreamSource(stream);
       var scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
@@ -1014,18 +984,41 @@ export function buildCallPageHtml(params: {
     console.log('[EL] Daily call object created');
 
     frame.on('track-started', function(event) {
-      if (!event || !event.track || event.track.kind !== 'video') return;
+      if (!event || !event.track) return;
       var p = event.participant;
       if (!p || p.local) return;
-      if (tavusVideo) {
-        tavusVideo.srcObject = new MediaStream([event.track]);
-        console.log('[Daily] Tavus video track attached');
+
+      if (event.track.kind === 'video') {
+        if (tavusVideo) {
+          tavusVideo.srcObject = new MediaStream([event.track]);
+          console.log('[Daily] Tavus video track attached');
+        }
+      }
+
+      if (event.track.kind === 'audio') {
+        var existing = document.getElementById('tavus-audio-el');
+        if (!existing) {
+          var audioEl = document.createElement('audio');
+          audioEl.id = 'tavus-audio-el';
+          audioEl.autoplay = true;
+          audioEl.style.display = 'none';
+          document.body.appendChild(audioEl);
+          existing = audioEl;
+        }
+        existing.srcObject = new MediaStream([event.track]);
+        console.log('[Daily] Tavus audio track attached');
       }
     });
 
     frame.on('track-stopped', function(event) {
-      if (!event || !event.track || event.track.kind !== 'video') return;
-      if (tavusVideo) { tavusVideo.srcObject = null; }
+      if (!event || !event.track) return;
+      if (event.track.kind === 'video') {
+        if (tavusVideo) { tavusVideo.srcObject = null; }
+      }
+      if (event.track.kind === 'audio') {
+        var el = document.getElementById('tavus-audio-el');
+        if (el) { el.srcObject = null; el.remove(); }
+      }
     });
 
     frame.on('participant-joined', function(event) {
@@ -1033,7 +1026,7 @@ export function buildCallPageHtml(params: {
       if (!p || p.local) return;
       try {
         frame.updateParticipant(p.session_id, {
-          setSubscribedTracks: { audio: false, video: true },
+          setSubscribedTracks: { audio: true, video: true },
         });
       } catch(e) {}
     });
@@ -1056,7 +1049,7 @@ export function buildCallPageHtml(params: {
         Object.keys(participants).forEach(function(id) {
           if (participants[id].local) return;
           frame.updateParticipant(id, {
-            setSubscribedTracks: { audio: false, video: true },
+            setSubscribedTracks: { audio: true, video: true },
           });
         });
       } catch(e) {}

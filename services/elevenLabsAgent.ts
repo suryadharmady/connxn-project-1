@@ -13,6 +13,7 @@ const WS_BASE = 'wss://api.elevenlabs.io/v1/convai/conversation';
 type AudioOutputCallback = (base64Audio: string, eventId: number) => void;
 type AgentResponseCallback = (text: string) => void;
 type StatusCallback = () => void;
+type TranscriptCallback = (text: string, isFinal: boolean, speaker: 'user' | 'agent') => void;
 
 export class ElevenLabsAgent {
   private ws: WebSocket | null = null;
@@ -33,6 +34,7 @@ export class ElevenLabsAgent {
   private _onInterruption: StatusCallback | null = null;
   private _onConnected: StatusCallback | null = null;
   private _onDisconnected: StatusCallback | null = null;
+  private _onTranscript: TranscriptCallback | null = null;
 
   /* ------------------------------------------------------------------ */
   /*  Public API                                                         */
